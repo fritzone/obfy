@@ -8,37 +8,14 @@
 
 //
 
-template<typename T>
-struct Num
-{
-    template <T n, int D = 0>
-    struct VH
-    {
-        enum { value = ( (n & 0x01)  | ( Num < T >::VH<(n >> 1)>::value << 1) ) };
-        T v = value;
-    };
-};
-
-template <typename T> template<int D> struct Num<T>::VH<0,D>
-{
-    enum {value = 0};
-    T v = value;
-};
-
-template <typename T> template <int D> struct Num<T>::VH<1,D>
-{
-    enum {value = 1};
-    T v = value;
-};
-
-
-
-template<int x> struct _;
-
-
 int main()
 {
-    int bb =Num<int>::VH<66>::value ;
+    int bb = _N(452);
+    /*
+    std::cout << "VALUE1:" << bb << std::endl;
+
+    int bb2 = MetaRandom<1,255>::value ;
+    std::cout << "VALUE2:" << bb2 << std::endl;
 
     char s[123];
     sprintf(s, "%03X", 45);
@@ -82,7 +59,7 @@ int main()
         _(a) += 1;
 
     END;
-*/
+
     if( a == 5)
     {
         b = 9;
@@ -100,7 +77,7 @@ int main()
     END
 
     std::cout << "REALLY AFTER:" << a << " " << b << " " << v << std::endl;
-
+*/
     return 0;
 
 }

@@ -279,6 +279,33 @@ class extra_chooser
     using type=basic_extra; // intentionally private
 };
 
+
+template<typename T>
+struct Num
+{
+    template <T n, int D = 0>
+    struct VH
+    {
+        enum { value = ( (n & 0x01)  | ( Num < T >::VH<(n >> 1)>::value << 1) ) };
+        T v = value;
+    };
+};
+
+template <typename T> template<int D> struct Num<T>::VH<0,D>
+{
+    enum {value = 0};
+    T v = value;
+};
+
+template <typename T> template <int D> struct Num<T>::VH<1,D>
+{
+    enum {value = 1};
+    T v = value;
+};
+
+#define _N(a) (Num<decltype(a)>::VH<MetaRandom<__COUNTER__, 4096>::value ^ a>().v ^ MetaRandom<__COUNTER__ - 1, 4096>::value)
+
+
 #define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
 
 DEFINE_EXTRA(0, extra_xor);
