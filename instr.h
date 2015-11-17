@@ -8,7 +8,7 @@
 #define MAX_BOGUS_IMPLEMENTATIONS 3
 #endif
 
-// random generator shamelessly copied from https://github.com/andrivet/ADVobfuscator
+// random generator reusing from https://github.com/andrivet/ADVobfuscator
 // Copyright (c) 2010-2014, Sebastien Andrivet
 // All rights reserved.
 namespace
@@ -53,15 +53,25 @@ struct MetaRandom
 };
 
 #define COMP_ASSIGNMENT_OPERATOR(x) \
-    refholder<T>& operator x##= (const refholder<T>& ov) { v x##= ov.v; return *this;} \
+    refholder<T>& operator x##= (const refholder<T>& ov) { v x##= ov.v; return *this;}  \
     refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;} \
-    refholder<T>& operator x##= (const T& ov) { v x##= ov; return *this;} \
-    refholder<T>& operator x##= (T&& ov) { v x##= ov; return *this;} \
-    refholder<T>& operator x##= (const T&& ov) { v x##= ov; return *this;} \
+    refholder<T>& operator x##= (const T& ov) { v x##= ov; return *this;}               \
+    refholder<T>& operator x##= (const T&& ov) { v x##= ov; return *this;}              \
+    refholder<T>& operator x##= (T& ov) { v x##= ov; return *this;}                     \
+    refholder<T>& operator x##= (T&& ov) { v x##= ov; return *this;}
 
 #define COMPARISON_OPERATOR(x) \
     bool operator x (const T& ov) { return (v x ov); }
 
+#define DISABLE_BINARY_OPERATOR(x) \
+    refholder& operator x (const refholder<T>&);        \
+    refholder& operator x (const refholder<T>&&);       \
+    refholder& operator x (refholder<T>&&);             \
+    refholder& operator x (refholder<T>&);              \
+    refholder& operator x (const T&);                   \
+    refholder& operator x (const T&&)
+
+/* simple reference holder class, mostly for dealing with numbers */
 template <typename T>
 class refholder
 {
@@ -94,13 +104,19 @@ public:
     COMP_ASSIGNMENT_OPERATOR(^)
 
 private:
-
     T& v;
-    static refholder<T> novalue;
-};
 
-template<typename T>
-refholder<T> refholder<T>::novalue;
+    DISABLE_BINARY_OPERATOR(+);
+    DISABLE_BINARY_OPERATOR(-);
+    DISABLE_BINARY_OPERATOR(*);
+    DISABLE_BINARY_OPERATOR(/);
+    DISABLE_BINARY_OPERATOR(%);
+    DISABLE_BINARY_OPERATOR(&);
+    DISABLE_BINARY_OPERATOR(|);
+    DISABLE_BINARY_OPERATOR(<<);
+    DISABLE_BINARY_OPERATOR(>>);
+
+};
 
 struct void_functor_base
 {
@@ -216,7 +232,7 @@ template <class T>
 class extra_xor : public basic_extra
 {
 public:
-    extra_xor(T& a) : v(a)
+    extra_xor(T& a) : v(a), rv(0)
     {
         std::random_device rd;
         std::mt19937 mt(rd());

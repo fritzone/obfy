@@ -3,13 +3,52 @@
 
 #include "instr.h"
 
+#include <boost/mpl/assert.hpp>
+#include <boost/mpl/int.hpp>
+
+//
+
+template<typename T>
+struct Num
+{
+    template <T n, int D = 0>
+    struct VH
+    {
+        enum { value = ( (n & 0x01)  | ( Num < T >::VH<(n >> 1)>::value << 1) ) };
+        T v = value;
+    };
+};
+
+template <typename T> template<int D> struct Num<T>::VH<0,D>
+{
+    enum {value = 0};
+    T v = value;
+};
+
+template <typename T> template <int D> struct Num<T>::VH<1,D>
+{
+    enum {value = 1};
+    T v = value;
+};
+
+
+
+template<int x> struct _;
+
+
 int main()
 {
+    int bb =Num<int>::VH<66>::value ;
+
     char s[123];
     sprintf(s, "%03X", 45);
-    std::cerr << s << std::endl;
+    std::cout << s << std::endl;
 
-    int a = 5, b = 6, v = 0;
+
+    std::cout << "VALUE:" << bb << std::endl;
+
+
+        int a = 5, b = 6, v = 0;
 
     std::cout << "BEFOR:" << a<< std::endl;
 
@@ -57,6 +96,7 @@ int main()
 
         _(b) += 50;
         _(a) = 66;
+
     END
 
     std::cout << "REALLY AFTER:" << a << " " << b << " " << v << std::endl;

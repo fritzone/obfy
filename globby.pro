@@ -5,9 +5,7 @@ CONFIG -= qt
 
 SOURCES += main.cpp
 
-include(deployment.pri)
-qtcAddDeployment()
-QMAKE_CXXFLAGS += -std=c++11
+QMAKE_CXXFLAGS += -std=c++11 -Wextra -Wall
 
 HEADERS += \
     instr.h
