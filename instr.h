@@ -73,24 +73,32 @@ struct MetaRandom
 
 /* simple reference holder class, mostly for dealing with numbers */
 template <typename T>
-class refholder
+class refholder final
 {
 public:
+    /* Construction, destruction */
+    refholder() = delete;
     refholder(T& pv) : v(pv) {}
+    ~refholder() = default;
 
-    /* Comparison operator */
-    COMPARISON_OPERATOR(==)
+    /* Assignment */
+    refholder<T>& operator = (const T& ov) { v = ov; return *this;}
+    refholder<T>& operator = (const refholder<T>& ov ) { v = ov.v; return *this; }
+
+    /* Comparison */
+    bool operator == (const T& ov) { return !(v ^ ov); }
+    bool operator != (const T& ov) { return !operator ==(ov); }
     COMPARISON_OPERATOR(>=)
     COMPARISON_OPERATOR(<=)
-    COMPARISON_OPERATOR(!=)
     COMPARISON_OPERATOR(>)
     COMPARISON_OPERATOR(<)
 
     /* Conversion to the real type */
     operator T() {return v;}
 
-    /* Assignment */
-    refholder<T>& operator = (const T& ov) { v = ov; return *this;}
+    /* Pre increment/decrement only */
+    refholder<T>& operator++() { ++ v; return *this; }
+    refholder<T>& operator--() { -- v; return *this; }
 
     /* Compound assignments */
     COMP_ASSIGNMENT_OPERATOR(+)
@@ -104,8 +112,11 @@ public:
     COMP_ASSIGNMENT_OPERATOR(^)
 
 private:
+
+    /* The root of all evil */
     T& v;
 
+    /* All binary ops. disabled */
     DISABLE_BINARY_OPERATOR(+);
     DISABLE_BINARY_OPERATOR(-);
     DISABLE_BINARY_OPERATOR(*);
@@ -116,18 +127,55 @@ private:
     DISABLE_BINARY_OPERATOR(<<);
     DISABLE_BINARY_OPERATOR(>>);
 
+    /* Disable post increment/decrement */
+    refholder<T>& operator++(int);
+    refholder<T>& operator--(int);
+
 };
 
-struct void_functor_base
+
+/* Helping stuff */
+
+struct base_rvholder
 {
-    virtual void run() = 0;
+    template<class T>
+    operator T ()
+    {
+        return *reinterpret_cast<T*>(get());
+    }
+
+    virtual void* get() = 0;
+};
+
+template<class T>
+struct rvholder : public base_rvholder
+{
+    rvholder(T t) :base_rvholder(), v(t) {}
+    virtual void* get() {return &v;}
+    T v;
+};
+
+
+/* what the RETURN/BREAK/CONTINUE will return while running from inside a loop block*/
+enum class next_step
+{
+    ns_break,
+    ns_continue,
+    ns_return,
+    ns_done
+};
+
+struct next_step_functor_base
+{
+    virtual next_step run() = 0;
+
 };
 
 template <class T>
-struct functor : public void_functor_base {
+struct next_step_functor final : public next_step_functor_base {
 
-    functor(T r) : runner(r) {}
-    virtual void run() {runner();}
+    next_step_functor(T r) : runner(r) {}
+    virtual next_step run() {return runner();}
 
 private:
     T runner;
@@ -139,7 +187,7 @@ struct bool_functor_base
 };
 
 template <class T>
-struct bool_functor : public bool_functor_base {
+struct bool_functor final : public bool_functor_base {
 
     bool_functor(T r) : runner(r) {}
     virtual bool run() {return runner();}
@@ -148,36 +196,96 @@ private:
     T runner;
 };
 
+/* c++ control structures implementation */
 
-class while_wrapper
+/* supporting implementation for the REPEAT/UNTIL macros*/
+
+class repeat_wrapper
 {
 public:
-    template<class T>
-    while_wrapper(T lambda) {condition.reset(new bool_functor<T>(lambda));}
-
-    ~while_wrapper()
-    {
-        while( condition->run() )
-        {
-            body->run();
-        }
-    }
-
-    template<class T>
-    void set_body(T lambda) { body.reset(new functor<T>(lambda)); }
+    repeat_wrapper():body(nullptr), condition(nullptr) {}
 
 private:
-    std::unique_ptr<void_functor_base> body;
+
+    std::unique_ptr<next_step_functor_base> body;
     std::unique_ptr<bool_functor_base> condition;
 };
 
-class if_wrapper
+/* supporting implementation for the FOR macro */
+
+class for_wrapper final
+{
+public:
+
+    template<class INIT, class COND, class INCR>
+    explicit for_wrapper(INIT lambda_init, COND lambda_cond, INCR lambda_incr)
+    {
+        condition.reset(new bool_functor<COND>(lambda_cond));
+        initializer.reset(new next_step_functor<INIT>(lambda_init));
+        increment.reset(new next_step_functor<INCR>(lambda_incr));
+    }
+
+    void run()
+    {
+        for( initializer->run(); condition->run(); increment->run())
+        {
+            next_step c = body->run();
+            if(c == next_step::ns_break) break;
+            if(c == next_step::ns_continue) continue;
+        }
+    }
+
+    ~for_wrapper() noexcept = default;
+
+    template<class T>
+    for_wrapper& set_body(T lambda) { body.reset(new next_step_functor<T>(lambda)); return *this; }
+private:
+    std::unique_ptr<next_step_functor_base> initializer;
+    std::unique_ptr<bool_functor_base> condition;
+    std::unique_ptr<next_step_functor_base> increment;
+    std::unique_ptr<next_step_functor_base> body;
+
+
+};
+
+/* supporting implementation for the WHILE macro */
+
+class while_wrapper final
+{
+public:
+    template<class T>
+    explicit while_wrapper(T lambda) :body(nullptr), condition(nullptr)
+    {condition.reset(new bool_functor<T>(lambda));}
+
+    void run()
+    {
+        while( condition->run() )
+        {
+            next_step c = body->run();
+            if(c == next_step::ns_break) break;
+            if(c == next_step::ns_continue) continue;
+        }
+    }
+
+    ~while_wrapper() noexcept = default;
+
+    template<class T>
+    while_wrapper& set_body(T lambda) { body.reset(new next_step_functor<T>(lambda)); return *this; }
+
+private:
+    std::unique_ptr<next_step_functor_base> body;
+    std::unique_ptr<bool_functor_base> condition;
+};
+
+/* supporting implementation for the IF macro */
+
+class if_wrapper final
 {
 public:
     template<class T>
     if_wrapper(T lambda) {condition.reset(new bool_functor<T>(lambda));}
 
-    ~if_wrapper()
+    void run()
     {
         if(condition->run()) { if(thens) {
             thens->run();
@@ -185,20 +293,21 @@ public:
         else { if(elses) {
             elses->run();
         }}
+
     }
 
+    ~if_wrapper() noexcept = default;
+
     template<class T>
-    if_wrapper& set_then(T lambda) { thens.reset(new functor<T>(lambda)); return *this; }
+    if_wrapper& set_then(T lambda) { thens.reset(new next_step_functor<T>(lambda)); return *this; }
     template<class T>
-    void set_else(T lambda) { elses.reset(new functor<T>(lambda)); }
+    if_wrapper& set_else(T lambda) { elses.reset(new next_step_functor<T>(lambda)); return *this; }
 
 private:
     std::unique_ptr<bool_functor_base> condition;
-    std::unique_ptr<void_functor_base> thens;
-    std::unique_ptr<void_functor_base> elses;
+    std::unique_ptr<next_step_functor_base> thens;
+    std::unique_ptr<next_step_functor_base> elses;
 };
-
-
 
 template<typename X>
 refholder<X> $ (X& a)
@@ -206,10 +315,8 @@ refholder<X> $ (X& a)
     return refholder<X>(a);
 }
 
-class stream_helper
-{
-};
-
+/* syntactic sugar */
+class stream_helper {};
 template <typename T>
 refholder<T> operator << (stream_helper, T& a)
 {
@@ -239,8 +346,6 @@ public:
         std::uniform_real_distribution<double> dist(1.0, 10.0);
         rv = dist(mt);
         $(v) ^=  rv;
-        std::cerr <<"XOR " << rv << std::endl;
-
     }
     virtual ~extra_xor() { $(v) ^=  rv; }
 
@@ -253,7 +358,7 @@ template <class T>
 class extra_addition : public basic_extra
 {
 public:
-    extra_addition(T& a) : v(a) {std::cerr <<"ADD\n";  $(v) += 1; }
+    extra_addition(T& a) : v(a) {$(v) += 1; }
     virtual ~extra_addition() { $(v) -= 1; }
 
 private:
@@ -265,7 +370,7 @@ template <class T>
 class extra_substraction : public basic_extra
 {
 public:
-    extra_substraction(T& a) : v(a) {std::cerr <<"SUB\n";  $(v) -= 1; }
+    extra_substraction(T& a) : v(a) {$(v) -= 1; }
     virtual ~extra_substraction() { $(v) += 1; }
 
 private:
@@ -279,6 +384,7 @@ class extra_chooser
     using type=basic_extra; // intentionally private
 };
 
+/* Number obfuscation implementer */
 
 template<typename T>
 struct Num
@@ -287,7 +393,17 @@ struct Num
     struct VH
     {
         enum { value = ( (n & 0x01)  | ( Num < T >::VH<(n >> 1)>::value << 1) ) };
-        T v = value;
+        T v;
+        T rv;
+        VH() : v(0), rv(0)
+        {
+            std::random_device rd;
+            std::mt19937 mt(rd());
+            std::uniform_real_distribution<double> dist(1.0, 10.0);
+            rv = dist(mt);
+            v = value ^ rv;
+        }
+        T get() const { return v ^ rv;}
     };
 };
 
@@ -303,22 +419,28 @@ template <typename T> template <int D> struct Num<T>::VH<1,D>
     T v = value;
 };
 
-#define _N(a) (Num<decltype(a)>::VH<MetaRandom<__COUNTER__, 4096>::value ^ a>().v ^ MetaRandom<__COUNTER__ - 1, 4096>::value)
-
-
+#define _N(a) (Num<decltype(a)>::VH<MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ MetaRandom<__COUNTER__ - 1, 4096>::value)
 #define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
-
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
+#define _(a) ([&](){extra_chooser<decltype(a), MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _ec_##__COUNTER__(a);\
+            return stream_helper();}() << a)
+#define IF(x) { std::shared_ptr<base_rvholder> rvlocal; if_wrapper(( [&] () { return (x); })).set_then( [&]() {
+#define ELSE return next_step::ns_done;}).set_else( [&]() {
+#define FOR(init,cond,inc) { std::shared_ptr<base_rvholder> rvlocal; for_wrapper( [&](){init;return next_step::ns_done;}, [&](){return cond;}, [&](){inc;return next_step::ns_done;}).set_body( [&]() {
+#define END return next_step::ns_done;}).run(); }
+#define ENDIF END
+#define ENDWHILE END
+#define ENDFOR END
+#define BREAK return next_step::ns_break;
+#define RETURN(x) rvlocal.reset(new rvholder<decltype(x)>(x));  throw rvlocal;
+#define CONTINUE return next_step::ns_continue;
+#define WHILE(x) {std::shared_ptr<base_rvholder> rvlocal; while_wrapper([&] () { return (x); }).set_body( [&]() {
+#define REPEAT
+#define UNTIL
 
-#define _(a) [&](){extra_chooser<decltype(a), MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _ec_##__COUNTER__(a);  return stream_helper();}() << a
-
-#define IF(x) if_wrapper(( [&] () { return x; })).set_then( [&]() {
-#define ELSE }).set_else( [&]() {
-#define END });
-#define WHILE(x) while_wrapper([&] () { return x; }).set_body( [&]() {
-#define END });
-
+#define OBF_BEGIN try {
+#define OBF_END } catch(std::shared_ptr<base_rvholder>& r) { return *r; }
 
 #endif // INSTR_H

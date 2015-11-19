@@ -10,3 +10,6 @@ QMAKE_CXXFLAGS += -std=c++11 -Wextra -Wall
 HEADERS += \
     instr.h
 
+DISTFILES += \
+    limitations.txt
+

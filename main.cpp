@@ -6,78 +6,64 @@
 #include <boost/mpl/assert.hpp>
 #include <boost/mpl/int.hpp>
 
+#include <type_traits>
 //
 
 int main()
 {
-    int bb = _N(452);
-    /*
-    std::cout << "VALUE1:" << bb << std::endl;
 
-    int bb2 = MetaRandom<1,255>::value ;
-    std::cout << "VALUE2:" << bb2 << std::endl;
+    int a = 5, b = 6, v=7;
 
-    char s[123];
-    sprintf(s, "%03X", 45);
-    std::cout << s << std::endl;
+    OBF_BEGIN
 
+        IF(a == 5)
+            IF(b == 6)
+                RETURN(_N(77))
+            ENDIF
+        ENDIF
 
-    std::cout << "VALUE:" << bb << std::endl;
-
-
-        int a = 5, b = 6, v = 0;
+    OBF_END
 
     std::cout << "BEFOR:" << a<< std::endl;
 
-    /*
-    IF( _(a) == 9 )
+    IF( _(a) == _N(9) )
 
-         _(a)  = 6;
-
-         IF ( _(b) == 8 )
-             _(a)  = 11;
-         END
-
-         _(b)  = 12;
-         _(b) = a + 5;
-     ELSE
-          _(a) = 9;
+         _(b) = a + _N(5);
+    ELSE
+         _(a) = _N(9);
          _(b) = a + b;
-     END;
+    ENDIF
 
-    WHILE( _(a)  < 10)
+    std::cout << "AF:" << a << " " << b<< std::endl;
+
+    std::cout << "BALBLALA:" << a<< std::endl;
+
+    _(a) = 1;
+    WHILE( _(a)  < _N(10) )
 
         std::cout << "IN:" << a<< std::endl;
 
-        IF(_(a) == 9 && _(b) == 15)
-            _(a) = 7;
-            _(b) = 1;
-        END
 
          v = _(a);
 
-        _(a) += 1;
-
-    END;
-
-    if( a == 5)
-    {
-        b = 9;
-    }
-
+        _(a) += _N(1);
+    ENDWHILE
 
     std::cout << "AFTER:" << a << " " << b << " " << v << std::endl;
 
+    IF( _(b)  == _N(1) )
 
-    IF( _(b)  == 9)
+        _(b) += _N(50);
+        _(a) = _N(66);
 
-        _(b) += 50;
-        _(a) = 66;
+        _(a) = _(b);
 
-    END
+    ENDIF
 
-    std::cout << "REALLY AFTER:" << a << " " << b << " " << v << std::endl;
-*/
+    FOR( ( _(a)=_N(0), _(b)=_N(10) ) , (_(a) < _N(10) ), ( ++ _(a), -- _(b)) )
+        std::cout << "INFOR:" << a <<" B=" << b<< std::endl;
+    ENDFOR
+
     return 0;
 
 }
