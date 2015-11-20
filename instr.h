@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <random>
+#include <type_traits>
 
 #ifndef MAX_BOGUS_IMPLEMENTATIONS
 #define MAX_BOGUS_IMPLEMENTATIONS 3
@@ -65,15 +66,18 @@ template <int N> struct ConstructIndexList {
     using Result = typename Append<typename ConstructIndexList<N - 1>::Result, N - 1>::Result;
 };
 template <> struct ConstructIndexList<0> { using Result = obf::IndexList<>; };
-static constexpr char xor_value = static_cast<char>(MetaRandom<__COUNTER__, 0xFF>::value);
+#ifdef _MSC_VER
+#pragma warning(disable:4309)
+#endif
+static constexpr char xor_value = (MetaRandom<0, 0xFE>::value);
 constexpr char EncryptCharacter(const char Character, int Index) { return Character ^ (xor_value + Index); }
 
 template <typename IndexList> class crypted_string;
 template <std::size_t... L> class crypted_string<IndexList<L...> > {
 public:
-    constexpr crypted_string(const char* const str) : value { EncryptCharacter(str[L], L)... } {}
-    operator const char* () const { return decrypted().c_str(); }
-    char operator[] (std::size_t idx) const {return decrypted()[idx];}
+    constexpr explicit crypted_string(const char* const str) : value { EncryptCharacter(str[L], L)... } {}
+    std::string std_str() const { return decrypted(); }
+    char operator[] (std::size_t idx) const {return std_str()[idx];}
 private:
     char value[sizeof...(L) + 1];
     std::string decrypted() const
@@ -81,9 +85,8 @@ private:
         char decr[sizeof...(L) + 1] = {0};
         for(std::size_t t = 0; t < sizeof...(L); t++)
         {
-            decr[t] = value[t] ^ (xor_value + t);
+            decr[t] = value[t] ^ (xor_value + static_cast<char>(t) );
         }
-
         return std::string(decr);
     }
 };
@@ -380,19 +383,14 @@ template <class T>
 class extra_xor : public basic_extra
 {
 public:
-    extra_xor(T& a) : v(a), rv(0)
+    extra_xor(T& a) : v(a)
     {
-        std::random_device rd;
-        std::mt19937 mt(rd());
-        std::uniform_real_distribution<double> dist(1.0, 10.0);
-        rv = dist(mt);
-        $(v) ^=  rv;
+        $(v) ^= MetaRandom<16, 4096>::value;
     }
-    virtual ~extra_xor() { $(v) ^=  rv; }
+    virtual ~extra_xor() { $(v) ^= MetaRandom<16, 4096>::value; }
 
 private:
     T& v;
-    T rv;
 };
 
 template <class T>
@@ -432,16 +430,11 @@ struct Num
 {
     enum { value = ( (n & 0x01)  | ( Num < T , (n >> 1)>::value << 1) ) };
     T v;
-    T rv;
-    Num() : v(0), rv(0)
+    Num() : v(0)
     {
-        std::random_device rd;
-        std::mt19937 mt(rd());
-        std::uniform_real_distribution<double> dist(1.0, 10.0);
-        rv = dist(mt);
-        v = value ^ rv;
+        v = value ^  MetaRandom<32, 4096>::value;
     }
-    T get() const { return v ^ rv;}
+    T get() const { return v ^ MetaRandom<32, 4096>::value;}
 };
 
 template <> struct Num<int,0>
