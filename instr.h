@@ -52,6 +52,47 @@ struct MetaRandom
     static const int value = MetaRandomGenerator<N + 1>::value % M;
 };
 
+// String Encryption, based on
+// "Malware related compile-time hacks with C++11" by LeFF
+// http://www.unknowncheats.me/forum/c-and-c/113715-compile-time-string-encryption.html
+
+namespace obf
+{
+template <int... Pack> struct IndexList {};
+template <typename IndexList, int Right> struct Append;
+template <int... Left, int Right> struct Append<IndexList<Left...>, Right> {using Result=IndexList<Left..., Right>; };
+template <int N> struct ConstructIndexList {
+    using Result = typename Append<typename ConstructIndexList<N - 1>::Result, N - 1>::Result;
+};
+template <> struct ConstructIndexList<0> { using Result = obf::IndexList<>; };
+static constexpr char xor_value = static_cast<char>(MetaRandom<__COUNTER__, 0xFF>::value);
+constexpr char EncryptCharacter(const char Character, int Index) { return Character ^ (xor_value + Index); }
+
+template <typename IndexList> class crypted_string;
+template <std::size_t... L> class crypted_string<IndexList<L...> > {
+public:
+    constexpr crypted_string(const char* const str) : value { EncryptCharacter(str[L], L)... } {}
+    operator const char* () const { return decrypted().c_str(); }
+    char operator[] (std::size_t idx) const {return decrypted()[idx];}
+private:
+    char value[sizeof...(L) + 1];
+    std::string decrypted() const
+    {
+        char decr[sizeof...(L) + 1] = {0};
+        for(std::size_t t = 0; t < sizeof...(L); t++)
+        {
+            decr[t] = value[t] ^ (xor_value + t);
+        }
+
+        return std::string(decr);
+    }
+};
+}
+
+#define _T(String) obf::crypted_string<obf::ConstructIndexList<sizeof(String)-1>::Result>(String)
+
+// done string encryption
+
 #define COMP_ASSIGNMENT_OPERATOR(x) \
     refholder<T>& operator x##= (const refholder<T>& ov) { v x##= ov.v; return *this;}  \
     refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;} \
@@ -386,49 +427,45 @@ class extra_chooser
 
 /* Number obfuscation implementer */
 
-template<typename T>
+template<typename T, T n>
 struct Num
 {
-    template <T n, int D = 0>
-    struct VH
+    enum { value = ( (n & 0x01)  | ( Num < T , (n >> 1)>::value << 1) ) };
+    T v;
+    T rv;
+    Num() : v(0), rv(0)
     {
-        enum { value = ( (n & 0x01)  | ( Num < T >::VH<(n >> 1)>::value << 1) ) };
-        T v;
-        T rv;
-        VH() : v(0), rv(0)
-        {
-            std::random_device rd;
-            std::mt19937 mt(rd());
-            std::uniform_real_distribution<double> dist(1.0, 10.0);
-            rv = dist(mt);
-            v = value ^ rv;
-        }
-        T get() const { return v ^ rv;}
-    };
+        std::random_device rd;
+        std::mt19937 mt(rd());
+        std::uniform_real_distribution<double> dist(1.0, 10.0);
+        rv = dist(mt);
+        v = value ^ rv;
+    }
+    T get() const { return v ^ rv;}
 };
 
-template <typename T> template<int D> struct Num<T>::VH<0,D>
+template <> struct Num<int,0>
 {
     enum {value = 0};
-    T v = value;
+    int v = value;
 };
 
-template <typename T> template <int D> struct Num<T>::VH<1,D>
+template <> struct Num<int,1>
 {
     enum {value = 1};
-    T v = value;
+    int v = value;
 };
 
-#define _N(a) (Num<decltype(a)>::VH<MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ MetaRandom<__COUNTER__ - 1, 4096>::value)
+#define _N(a) (Num<decltype(a), MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ MetaRandom<__COUNTER__ - 1, 4096>::value)
 #define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
 #define _(a) ([&](){extra_chooser<decltype(a), MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _ec_##__COUNTER__(a);\
             return stream_helper();}() << a)
-#define IF(x) { std::shared_ptr<base_rvholder> rvlocal; if_wrapper(( [&] () { return (x); })).set_then( [&]() {
+#define IF(x) { std::shared_ptr<base_rvholder> rvlocal; if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
 #define ELSE return next_step::ns_done;}).set_else( [&]() {
-#define FOR(init,cond,inc) { std::shared_ptr<base_rvholder> rvlocal; for_wrapper( [&](){init;return next_step::ns_done;}, [&](){return cond;}, [&](){inc;return next_step::ns_done;}).set_body( [&]() {
+#define FOR(init,cond,inc) { std::shared_ptr<base_rvholder> rvlocal; for_wrapper( [&](){init;return next_step::ns_done;}, [&]()->bool{return cond;}, [&](){inc;return next_step::ns_done;}).set_body( [&]() {
 #define END return next_step::ns_done;}).run(); }
 #define ENDIF END
 #define ENDWHILE END
@@ -436,7 +473,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define BREAK return next_step::ns_break;
 #define RETURN(x) rvlocal.reset(new rvholder<decltype(x)>(x));  throw rvlocal;
 #define CONTINUE return next_step::ns_continue;
-#define WHILE(x) {std::shared_ptr<base_rvholder> rvlocal; while_wrapper([&] () { return (x); }).set_body( [&]() {
+#define WHILE(x) {std::shared_ptr<base_rvholder> rvlocal; while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
 #define REPEAT
 #define UNTIL
 

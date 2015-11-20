@@ -2,17 +2,41 @@
 #include <stdio.h>
 
 #include "instr.h"
-
-#include <boost/mpl/assert.hpp>
-#include <boost/mpl/int.hpp>
-
 #include <type_traits>
-//
+#include <iostream>
+#include <memory>
+#include <random>
+
+
+int dummy(int &a)
+{
+    a = 5;
+    return 6;
+}
 
 int main()
 {
+    auto s = _T("Nigga I done steal ya bike") ;
+
+    std::cout << s[1] << std::endl;
 
     int a = 5, b = 6, v=7;
+
+    a += 7;
+    b += a;
+    a -= 7;
+    b -= 12;
+
+    b = dummy(a);
+
+    if(a == 5)
+    {
+        if(b == 6)
+        {
+            return 77;
+        }
+    }
+
 
     OBF_BEGIN
 
