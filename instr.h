@@ -9,20 +9,21 @@
 #define MAX_BOGUS_IMPLEMENTATIONS 3
 #endif
 
+namespace obf
+{
+
 // random generator reusing from https://github.com/andrivet/ADVobfuscator
 // Copyright (c) 2010-2014, Sebastien Andrivet
 // All rights reserved.
-namespace
-{
-    constexpr char time[] = __TIME__;
-    constexpr int DigitToInt(char c) { return c - '0'; }
-    const int seed = DigitToInt(time[7]) +
-                     DigitToInt(time[6]) * 10 +
-                     DigitToInt(time[4]) * 60 +
-                     DigitToInt(time[3]) * 600 +
-                     DigitToInt(time[1]) * 3600 +
-                     DigitToInt(time[0]) * 36000;
-}
+constexpr char time[] = __TIME__;
+constexpr int DigitToInt(char c) { return c - '0'; }
+const int seed = DigitToInt(time[7]) +
+                 DigitToInt(time[6]) * 10 +
+                 DigitToInt(time[4]) * 60 +
+                 DigitToInt(time[3]) * 600 +
+                 DigitToInt(time[1]) * 3600 +
+                 DigitToInt(time[0]) * 36000;
+
 template<int N>
 struct MetaRandomGenerator
 {
@@ -57,8 +58,6 @@ struct MetaRandom
 // "Malware related compile-time hacks with C++11" by LeFF
 // http://www.unknowncheats.me/forum/c-and-c/113715-compile-time-string-encryption.html
 
-namespace obf
-{
 template <int... Pack> struct IndexList {};
 template <typename IndexList, int Right> struct Append;
 template <int... Left, int Right> struct Append<IndexList<Left...>, Right> {using Result=IndexList<Left..., Right>; };
@@ -79,7 +78,7 @@ public:
     std::string std_str() const { return decrypted(); }
     char operator[] (std::size_t idx) const {return std_str()[idx];}
 private:
-    char value[sizeof...(L) + 1];
+    char value[sizeof...(L) + 1] = {0};
     std::string decrypted() const
     {
         char decr[sizeof...(L) + 1] = {0};
@@ -90,9 +89,8 @@ private:
         return std::string(decr);
     }
 };
-}
 
-#define _T(String) obf::crypted_string<obf::ConstructIndexList<sizeof(String)-1>::Result>(String)
+#define TEXT(String) obf::crypted_string<obf::ConstructIndexList<sizeof(String)-1>::Result>(String)
 
 // done string encryption
 
@@ -177,7 +175,6 @@ private:
 
 };
 
-
 /* Helping stuff */
 
 struct base_rvholder
@@ -249,6 +246,24 @@ class repeat_wrapper
 public:
     repeat_wrapper():body(nullptr), condition(nullptr) {}
 
+    void run()
+    {
+        do
+        {
+            next_step c = body->run();
+            if(c == next_step::ns_break) break;
+            if(c == next_step::ns_continue) continue;
+        }
+        while( condition->run() );
+    }
+
+    template<class T>
+    repeat_wrapper& set_body(T lambda) { body.reset(new next_step_functor<T>(lambda)); return *this; }
+
+
+    template<class T>
+    repeat_wrapper& set_condition(T lambda) { condition.reset(new bool_functor<T>(lambda)); return *this; }
+
 private:
 
     std::unique_ptr<next_step_functor_base> body;
@@ -288,7 +303,6 @@ private:
     std::unique_ptr<bool_functor_base> condition;
     std::unique_ptr<next_step_functor_base> increment;
     std::unique_ptr<next_step_functor_base> body;
-
 
 };
 
@@ -354,7 +368,7 @@ private:
 };
 
 template<typename X>
-refholder<X> $ (X& a)
+refholder<X> RH (X& a)
 {
     return refholder<X>(a);
 }
@@ -385,9 +399,9 @@ class extra_xor : public basic_extra
 public:
     extra_xor(T& a) : v(a)
     {
-        $(v) ^= MetaRandom<16, 4096>::value;
+        v ^= MetaRandom<16, 4096>::value;
     }
-    virtual ~extra_xor() { $(v) ^= MetaRandom<16, 4096>::value; }
+    virtual ~extra_xor() { v ^= MetaRandom<16, 4096>::value; }
 
 private:
     T& v;
@@ -397,8 +411,9 @@ template <class T>
 class extra_addition : public basic_extra
 {
 public:
-    extra_addition(T& a) : v(a) {$(v) += 1; }
-    virtual ~extra_addition() { $(v) -= 1; }
+    extra_addition(T& a) : v(a) { v += 1; }
+    virtual ~extra_addition() { v -= 1; }
+
 
 private:
     T& v;
@@ -409,8 +424,8 @@ template <class T>
 class extra_substraction : public basic_extra
 {
 public:
-    extra_substraction(T& a) : v(a) {$(v) -= 1; }
-    virtual ~extra_substraction() { $(v) += 1; }
+    extra_substraction(T& a) : v(a) {v -= 1; }
+    virtual ~extra_substraction() { v += 1; }
 
 private:
     T& v;
@@ -449,28 +464,37 @@ template <> struct Num<int,1>
     int v = value;
 };
 
-#define _N(a) (Num<decltype(a), MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ MetaRandom<__COUNTER__ - 1, 4096>::value)
+#define N(a) (obf::Num<decltype(a), obf::MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ obf::MetaRandom<__COUNTER__ - 1, 4096>::value)
 #define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
-#define _(a) ([&](){extra_chooser<decltype(a), MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _ec_##__COUNTER__(a);\
-            return stream_helper();}() << a)
-#define IF(x) { std::shared_ptr<base_rvholder> rvlocal; if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
-#define ELSE return next_step::ns_done;}).set_else( [&]() {
-#define FOR(init,cond,inc) { std::shared_ptr<base_rvholder> rvlocal; for_wrapper( [&](){init;return next_step::ns_done;}, [&]()->bool{return cond;}, [&](){inc;return next_step::ns_done;}).set_body( [&]() {
-#define END return next_step::ns_done;}).run(); }
+#define V(a) ([&](){obf::extra_chooser<decltype(a), obf::MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _ec_##__COUNTER__(a);\
+            return obf::stream_helper();}() << a)
+#define IF(x) { std::shared_ptr<obf::base_rvholder> rvlocal; obf::if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
+#define ELSE return obf::next_step::ns_done;}).set_else( [&]() {
+#define FOR(init,cond,inc) { std::shared_ptr<obf::base_rvholder> rvlocal; obf::for_wrapper( [&]()\
+           {init;return obf::next_step::ns_done;}, [&]()->bool{return cond;}, [&](){inc;return obf::next_step::ns_done;}).set_body( [&]() {
+#define END return obf::next_step::ns_done;}).run(); }
 #define ENDIF END
 #define ENDWHILE END
 #define ENDFOR END
-#define BREAK return next_step::ns_break;
-#define RETURN(x) rvlocal.reset(new rvholder<decltype(x)>(x));  throw rvlocal;
-#define CONTINUE return next_step::ns_continue;
-#define WHILE(x) {std::shared_ptr<base_rvholder> rvlocal; while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
-#define REPEAT
-#define UNTIL
-
+#define BREAK return obf::next_step::ns_break;
+#define RETURN(x) rvlocal.reset(new obf::rvholder<decltype(x)>(x));  throw rvlocal;
+#define CONTINUE return obf::next_step::ns_continue;
+#define WHILE(x) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
+#define REPEAT { std::shared_ptr<obf::base_rvholder> rvlocal; obf::repeat_wrapper().set_body( [&]() {
+#define UNTIL(x) return obf::next_step::ns_done;}).set_condition([&]()->bool{ return (x); }).run(); }
 #define OBF_BEGIN try {
-#define OBF_END } catch(std::shared_ptr<base_rvholder>& r) { return *r; }
+#define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; }
+
+#define CASE
+#define ENDCASE
+#define WHEN
+#define DO
+#define DONE
+#define OR
+
+} // namespace obf
 
 #endif // INSTR_H

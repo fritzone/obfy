@@ -16,7 +16,7 @@ int dummy(int &a)
 
 int main()
 {
-    auto s = _T("Nigga I done steal ya bike") ;
+    auto s = TEXT("Nigga I done steal ya bike tooo") ;
 
     std::cout << s[1] << std::endl;
 
@@ -29,62 +29,73 @@ int main()
 
     b = dummy(a);
 
-    if(a == 5)
-    {
-        if(b == 6)
-        {
-            return 77;
-        }
-    }
-
 
     OBF_BEGIN
 
-        IF(a == 5)
-            IF(b == 6)
-                RETURN(_N(77))
+        IF (a == 5)
+            IF (b == 8)
+                RETURN (N(77))
             ENDIF
         ENDIF
+
+        V(a) = N(1);
+
+        REPEAT
+            std::cerr << a << std::endl;
+            ++ V(a);
+        UNTIL(V(a) != N(12));
+
+        CASE (a)
+
+            WHEN(5) OR WHEN(4) DO
+             // something
+            DONE
+
+            WHEN(6) DO
+             // something else
+            DONE
+
+        ENDCASE
 
     OBF_END
 
     std::cout << "BEFOR:" << a<< std::endl;
 
-    IF( _(a) == _N(9) )
+    IF( V(a) == N(9) )
 
-         _(b) = a + _N(5);
+         V(b) = a + N(5);
     ELSE
-         _(a) = _N(9);
-         _(b) = a + b;
+         V(a) = N(9);
+         V(b) = a + b;
     ENDIF
 
     std::cout << "AF:" << a << " " << b<< std::endl;
 
     std::cout << "BALBLALA:" << a<< std::endl;
 
-    _(a) = 1;
-    WHILE( _(a)  < _N(10) )
+    V(a) = 1;
+    WHILE( V(a)  < N(10) )
 
         std::cout << "IN:" << a<< std::endl;
 
 
-         v = _(a);
+         v = V(a);
 
-        _(a) += _N(1);
+        V(a) += N(1);
     ENDWHILE
 
     std::cout << "AFTER:" << a << " " << b << " " << v << std::endl;
 
-    IF( _(b)  == _N(1) )
+    IF( V(b)  == N(1) )
 
-        _(b) += _N(50);
-        _(a) = _N(66);
+        V(b) += N(50);
+        V(a) = N(66);
 
-        _(a) = _(b);
+        V(a) = V(b);
 
     ENDIF
 
-    FOR( ( _(a)=_N(0), _(b)=_N(10) ) , (_(a) < _N(10) ), ( ++ _(a), -- _(b)) )
+    FOR( ( V(a)=N(0), V(b)=N(10) ) , (V(a) < N(10) ), ( ++ V(a), -- V(b)) )
         std::cout << "INFOR:" << a <<" B=" << b<< std::endl;
     ENDFOR
 
