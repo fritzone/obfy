@@ -3,7 +3,9 @@
 
 #include <memory>
 #include <random>
+#include <vector>
 #include <type_traits>
+#include <utility>
 
 #ifndef MAX_BOGUS_IMPLEMENTATIONS
 #define MAX_BOGUS_IMPLEMENTATIONS 3
@@ -180,19 +182,25 @@ private:
 struct base_rvholder
 {
     template<class T>
-    operator T ()
+    operator T () const
     {
-        return *reinterpret_cast<T*>(get());
+        return *reinterpret_cast<const T*>(get());
     }
 
-    virtual void* get() = 0;
+    template<class T>
+    bool operator == (const T& o) const
+    {
+        return o == operator T ();
+    }
+
+    virtual const void* get() const = 0;
 };
 
 template<class T>
 struct rvholder : public base_rvholder
 {
     rvholder(T t) :base_rvholder(), v(t) {}
-    virtual void* get() {return &v;}
+    virtual const void* get() const {return reinterpret_cast<const void*>(&v);}
     T v;
 };
 
@@ -228,13 +236,35 @@ struct bool_functor_base
 };
 
 template <class T>
-struct bool_functor final : public bool_functor_base {
-
+struct bool_functor final : public bool_functor_base
+{
     bool_functor(T r) : runner(r) {}
     virtual bool run() {return runner();}
 
 private:
     T runner;
+};
+
+struct any_functor_base
+{
+    virtual void run(void*) = 0;
+};
+
+template <class T>
+struct any_functor final : public any_functor_base
+{
+    any_functor(T r) : runner(r) {}
+
+    virtual void run(void* retv)
+    {
+        auto r = runner();
+        *reinterpret_cast<decltype(r)*>(retv) = r;
+    }
+
+
+private:
+    T runner;
+
 };
 
 /* c++ control structures implementation */
@@ -367,13 +397,142 @@ private:
     std::unique_ptr<next_step_functor_base> elses;
 };
 
+/* select ... case helper */
+
+class case_instruction
+{
+public:
+    virtual next_step execute(const base_rvholder&) const = 0;
+};
+
+template<class CT>
+class branch final : public case_instruction
+{
+public:
+    template<class T>
+    branch(T lambda) {condition.reset(new any_functor<T>(lambda));}
+
+    virtual next_step execute(const base_rvholder& against) const override
+    {
+        CT retv;
+        condition->run( (void*)(&retv) );
+        bool confirmed = against.operator == (retv) ;
+        if(confirmed)
+        {
+            return next_step::ns_done;
+        }
+        else
+        {
+            return next_step::ns_continue;
+        }
+    }
+
+private:
+    std::unique_ptr<any_functor_base> condition;
+};
+
+class body final : public case_instruction
+{
+public:
+    template<class T>
+    body(T lambda) {instructions.reset(new next_step_functor<T>(lambda));}
+
+
+    virtual next_step execute(const base_rvholder&) const override
+    {
+        return instructions->run();
+    }
+private:
+    std::unique_ptr<next_step_functor_base> instructions;
+};
+
+template<class CT>
+class case_wrapper final
+{
+public:
+    explicit case_wrapper(const CT& v) : check(v) {}
+
+    case_wrapper& add_entry(const case_instruction& lambda_holder)
+    {
+        steps.push_back(&lambda_holder);
+        return *this;
+    }
+
+    case_wrapper& join()
+    {
+        return *this;
+    }
+
+    void run()
+    {
+        auto it = steps.begin();
+        while(it != steps.end())
+        {
+            bool increased = false;
+            // see if  this is a branch or body
+            if(dynamic_cast<const branch<CT>*>(*it))
+            {
+                // branch. Execute it, see if it returns true or false
+                next_step enter = (*it)->execute(rvholder<CT>(check));
+                if(enter == next_step::ns_continue)
+                {
+                    // step to the next branch
+                    ++it;
+                    increased = true;
+                }
+                else
+                {
+                    // now fast forward and find the first body,
+                    // and from that point on run all the bodies, unless one of them breaks
+                    while(! dynamic_cast<const body*>(*it)  && it != steps.end() )
+                    {
+                        ++it;
+                        increased = true;
+                    }
+
+                    // found the first body.
+                    while(it != steps.end())
+                    {
+                        if(dynamic_cast<const body*>(*it))
+                        {
+                            next_step leave_switch = (*it)->execute(rvholder<CT>(check));
+                            if(leave_switch == next_step::ns_break)
+                            {
+                                return;
+                            }
+                        }
+                        increased = true;
+                        ++it;
+                    }
+                }
+            }
+            else
+            {
+                // shouldn't really get in here
+            }
+
+
+            // just for safety
+            if(!increased)
+            {
+                ++it;
+            }
+        }
+    }
+
+private:
+    std::vector<const case_instruction*> steps;
+    CT check;
+};
+
+/* syntactic sugar */
+
 template<typename X>
 refholder<X> RH (X& a)
 {
     return refholder<X>(a);
 }
 
-/* syntactic sugar */
 class stream_helper {};
 template <typename T>
 refholder<T> operator << (stream_helper, T& a)
@@ -488,12 +647,12 @@ DEFINE_EXTRA(2, extra_addition);
 #define OBF_BEGIN try {
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; }
 
-#define CASE
-#define ENDCASE
-#define WHEN
-#define DO
-#define DONE
-#define OR
+#define CASE(a) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::case_wrapper<decltype(a)>(a).
+#define ENDCASE run(); }
+#define WHEN(c) add_entry(obf::branch<decltype(c)>( [](){return (c);})).
+#define DO add_entry( obf::body([](){
+#define DONE return obf::next_step::ns_continue;})).
+#define OR join().
 
 } // namespace obf
 

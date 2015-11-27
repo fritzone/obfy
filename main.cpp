@@ -41,21 +41,25 @@ int main()
         V(a) = N(1);
 
         REPEAT
-            std::cerr << a << std::endl;
+            std::cout << a << std::endl;
             ++ V(a);
         UNTIL(V(a) != N(12));
+
+        a = 6;
 
         CASE (a)
 
             WHEN(5) OR WHEN(4) DO
-             // something
+                std::cout <<"Hurra, 5" << std::endl;
+                BREAK;
             DONE
 
             WHEN(6) DO
-             // something else
+                std::cout <<"Hurra, 6" << std::endl;
             DONE
 
         ENDCASE
+
 
     OBF_END
 
