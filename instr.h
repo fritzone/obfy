@@ -149,6 +149,7 @@ public:
     COMP_ASSIGNMENT_OPERATOR(-)
     COMP_ASSIGNMENT_OPERATOR(*)
     COMP_ASSIGNMENT_OPERATOR(/)
+    COMP_ASSIGNMENT_OPERATOR(%)
     COMP_ASSIGNMENT_OPERATOR(<<)
     COMP_ASSIGNMENT_OPERATOR(>>)
     COMP_ASSIGNMENT_OPERATOR(&)
@@ -644,7 +645,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define WHILE(x) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
 #define REPEAT { std::shared_ptr<obf::base_rvholder> rvlocal; obf::repeat_wrapper().set_body( [&]() {
 #define UNTIL(x) return obf::next_step::ns_done;}).set_condition([&]()->bool{ return (x); }).run(); }
-#define OBF_BEGIN try {
+#define OBF_BEGIN try { std::shared_ptr<obf::base_rvholder> rvlocal;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; }
 
 #define CASE(a) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::case_wrapper<decltype(a)>(a).

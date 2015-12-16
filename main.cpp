@@ -6,12 +6,81 @@
 #include <iostream>
 #include <memory>
 #include <random>
-
+#include <string.h>
 
 int dummy(int &a)
 {
     a = 5;
     return 6;
+}
+
+static const char letters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+bool check_license(const char* user, const char* users_license)
+{
+    std::string license;
+    size_t ll = strlen(users_license);
+    size_t l = strlen(user), lic_ctr = 0;
+    int add = 0;
+
+    for (int i = 0; i < ll; i++)
+        if (users_license[i] != '-')
+            license += users_license[i];
+
+    while (lic_ctr < license.length() )
+    {
+        size_t i = lic_ctr;
+        i %= l;
+        int current = 0;
+        while (i < l) current += user[i ++];
+        current += add;
+        add++;
+
+        if (license[lic_ctr] != letters[current % sizeof letters])
+            return false;
+
+        lic_ctr++;
+    }
+
+    return true;
+}
+
+bool check_license1(const char* user, const char* users_license)
+{
+    OBF_BEGIN
+    std::string license;
+    size_t ll = strlen(users_license);
+    size_t l = strlen(user), lic_ctr = 0;
+
+    size_t add = 0, i =0;
+
+    FOR (i = 0, i < ll, i++)
+        IF (users_license[i] != '-')
+            license += users_license[i];
+        ENDIF
+    ENDFOR
+
+    WHILE (V(lic_ctr) < license.length() )
+
+        size_t i = lic_ctr;
+        V(i) %= l;
+        int current = 0;
+        WHILE(i < l)
+            V(current) += user[i ++];
+        ENDWHILE
+        V(current) += V(add);
+        ++V(add);
+
+        IF ( (license [lic_ctr] != letters[current % sizeof letters]) )
+            RETURN(false);
+        ENDIF
+
+        lic_ctr++;
+    ENDWHILE
+
+    RETURN (true);
+
+    OBF_END
 }
 
 int main()
