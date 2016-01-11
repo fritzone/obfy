@@ -83,9 +83,52 @@ bool check_license1(const char* user, const char* users_license)
     OBF_END
 }
 
+
+std::string generate_license(const char* user)
+{
+    // the license will contain only these character
+    // 16 chars + 0
+    char result[17] = { 0 };
+    size_t l = strlen(user), lic_ctr = 0;
+    int add = 0;
+    while (lic_ctr < 16)
+    {
+        size_t i = lic_ctr;
+        i %= l;
+        int current = 0;
+        while (i < l)
+        {
+            current += user[i];
+            i++;
+        }
+        current += add;
+        add++;
+
+        result[lic_ctr] = letters[current % sizeof letters];
+        lic_ctr++;
+    }
+
+    return std::string(result);
+}
+
 int main()
 {
-    auto s = TEXT("Nigga I done steal ya bike tooo") ;
+    std::string s = generate_license("Ferenc Deak");
+    std::string license = "";
+    int current_size = 0;
+    for (size_t i = 0; i < s.length() ; i++)
+    {
+        license += s[i];
+        if (++current_size == 4 && i < s.length() - 1)
+        {
+            license += "-";
+            current_size = 0;
+        }
+    }
+    std::cout << "User:" << license  << std::endl;
+
+    std::cout << "Check:" << check_license1("Ferenc Deak", license.c_str()) << std::endl;
+    auto s1 = TEXT("Nigga I done steal ya bike tooo") ;
 
     std::cout << s[1] << std::endl;
 
