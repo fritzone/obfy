@@ -85,13 +85,20 @@ The license which this method validates comes in the form of the following
 "ABCD-EFGH-IJKL-MNOP" and there is an associated `generate_license` method which
 will be presented as an appendix to this article.
 
-The interesting part is the binary code of the method with annotations to
-recognize the corresponding C++ code:
+Also, the naivety of this method is exposed by using the very proper
+`check_license` name which immediately reveals to the up-to-be attacker where to
+look for the code checking the ... license. If you want to make harder for the
+attacker the identification of the license checking method I'd recommend either
+to use some irrelevant names or just strip all symbols from the executable as
+part of the release process.
+
+The interesting part is the binary code of the method obtained via compilation
+of the corresponding C++ code. It is intentionally NOT the Debug version, since
+we hardly should ship debug version of the code to our customers.
 
 ```cpp
 if (license[lic_ctr] != letters[current % sizeof letters])
     00FC15E4  lea         ecx,[license]  
-if (license[lic_ctr] != letters[current % sizeof letters])
     00FC15E7  cmovae      ecx,dword ptr [license]  
     00FC15EB  xor         edx,edx  
     00FC15ED  push        1Bh  
@@ -124,23 +131,58 @@ return true;
     00FC1627  jmp         check_license+0CAh (0FC1611h)
 ```
 
-Also, the naivety of this method is exposed by using the very proper
-`check_license` name which immediately reveals to the up-to-be attacker where to
-look for the code checking the ... license. If you want to make harder for the
-attacker the identification of the license checking method I'd recommend either
-to use some irrelevant names orjust strip all symbols from the executable as
-part of the release process.
+Let's analyze it for a short while. The essence of the validity checking happens
+at the address `00FC15F8` where the comparison `cmp al, byte ptr [edx+0FC42A4h]`
+takes place (for those wondering, `edx` gets its value as being the remainder
+of the division at `00FC15F0`).
 
-After identifying the method responsible for verifying the validity of the
-supplied license, the first instruction the attacker looks for is the `ret`,
-signaling to the CPU, this method is about to exit. The most common way of
-returning a value from a method call is to place the value in the `eax` register
-and let the calling code handle it. For this method the `ret` is to be found at
-`00FC1624` 
+At this stage the value of the `al` register is already initialized
+with the value of `license[lic_ctr]` and that is the actual comparison to see
+that it matches the actually expected character. If it does not match, the code
+jumps to `0FC1625h` where the `bl` register is zeroed out (`xor bl, bl`) and
+from there the jump goes backward to `0FC1611h` to leave the method with the
+`ret` instruction found at `00FC1624`. Otherwise the loop continues.
+
+The most common way of returning a value from a method call is to place the
+value in the `eax` register and let the calling code handle it, so before
+returning from the method the value of `al` is populated with the value of the
+`bl` register (via `mov al, bl` found at `00FC161D`).
+
+Please remember, that if the check discussed before did not succeed, the value
+of the `bl` register was 0, but this `bl` was initialized to `1` (via `mov bl,1`
+at `00FC160F`) in case the entire loop was successfully completed.
+
+If we think from the persepctive of an attacker, the only thing that needs to be
+done is to replace in the executable the binary sequence of `xor bl,bl` with the
+binary code of `mov bl,1`. Since luckily these two have the same length (2 bytes)
+the crack is ready to be published within a few seconds.
+
+Moreover, due to the simplicity of the implementation of the algorithm, a highly
+skilled cracker could easily create a key-generator for the application, which
+would be an even worse scenario, since the cracker didn't had to to modify the
+executable, thus further safety steps, such as integrity checks of the
+application would all be executed correctly, but there would be a publicly
+available key-generator which could be used by anyone to generate a license-key
+without ever paying for it, or malicious salesmen could generate counterfeit
+licenses which they could sell to unsuspecting customers.
+
+Here comes in picture our C++ Obfuscating framework.
 
 ## The C++ Obfuscating framework
 
 The C++ obfuscating framework provides a simple macro based mechanism for
-relevant applications to replace the C++ control structures and statements with
+relevant methods to replace the C++ control structures and statements with
 highly obfuscated code which makes the reverse engineering of the product a
 complex and complicated procedure.
+
+By using the framework the reverse engineering of the license checking algorithm
+presented in the previous paragraph would prove to be a highly challenging task
+due to the sheer amount of extra code generated by the frameworks´ macro engine.
+
+The framework has adopted a familiar, basic like syntax to make the switch from
+real C++ source code the the macro language of the framework as easy and
+painless as possible.
+
+### Discommodities of the framework
+
+Since

@@ -198,11 +198,15 @@ struct base_rvholder
 };
 
 template<class T>
-struct rvholder : public base_rvholder
+class rvholder : public base_rvholder
 {
-    rvholder(T t) :base_rvholder(), v(t) {}
+public:
+    rvholder(T t, T c) :base_rvholder(), v(t), check(c) {}
+    ~rvholder() { if (v != check) throw 1; }
     virtual const void* get() const {return reinterpret_cast<const void*>(&v);}
+private:
     T v;
+    T check;
 };
 
 
@@ -474,7 +478,7 @@ public:
             if(dynamic_cast<const branch<CT>*>(*it))
             {
                 // branch. Execute it, see if it returns true or false
-                next_step enter = (*it)->execute(rvholder<CT>(check));
+                next_step enter = (*it)->execute(rvholder<CT>(check,check));
                 if(enter == next_step::ns_continue)
                 {
                     // step to the next branch
@@ -496,7 +500,7 @@ public:
                     {
                         if(dynamic_cast<const body*>(*it))
                         {
-                            next_step leave_switch = (*it)->execute(rvholder<CT>(check));
+                            next_step leave_switch = (*it)->execute(rvholder<CT>(check,check));
                             if(leave_switch == next_step::ns_break)
                             {
                                 return;
@@ -640,7 +644,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define ENDWHILE END
 #define ENDFOR END
 #define BREAK return obf::next_step::ns_break;
-#define RETURN(x) rvlocal.reset(new obf::rvholder<decltype(x)>(x));  throw rvlocal;
+#define RETURN(x) rvlocal.reset(new obf::rvholder<decltype(x)>(x,x));  throw rvlocal;
 #define CONTINUE return obf::next_step::ns_continue;
 #define WHILE(x) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
 #define REPEAT { std::shared_ptr<obf::base_rvholder> rvlocal; obf::repeat_wrapper().set_body( [&]() {

@@ -23,7 +23,7 @@ bool check_license(const char* user, const char* users_license)
     size_t l = strlen(user), lic_ctr = 0;
     int add = 0;
 
-    for (int i = 0; i < ll; i++)
+    for (size_t i = 0; i < ll; i++)
         if (users_license[i] != '-')
             license += users_license[i];
 
