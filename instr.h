@@ -58,11 +58,11 @@ struct MetaRandom
 
 #define COMP_ASSIGNMENT_OPERATOR(x) \
     refholder<T>& operator x##= (const refholder<T>& ov) { v x##= ov.v; return *this;}  \
-/*    refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;}*/ \
+    refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;} \
     refholder<T>& operator x##= (const T& ov) { v x##= ov; return *this;}               \
-/*    refholder<T>& operator x##= (const T&& ov) { v x##= ov; return *this;}           */   \
-    refholder<T>& operator x##= (T& ov) { v x##= ov; return *this;}                     \
-/*    refholder<T>& operator x##= (T&& ov) { v x##= ov; return *this;}*/
+    refholder<T>& operator x##= (const T&& ov) { v x##= ov; return *this;}              \
+    refholder<T>& operator x##= (T& ov) { v x##= ov; return *this;}
+
 
 #define COMPARISON_OPERATOR(x) \
     bool operator x (const T& ov) { return (v x ov); }

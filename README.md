@@ -213,14 +213,15 @@ sequences that will be using obfuscated expressions.
 
 #### Value and numerical wrappers
 
-The numerical values can be wrapped in the macro `N()` and all numeric variables
-(`int`, `long`, ...) can be wrapped in the macro `V()` to provide an extra layer
-of obfuscation.
+To achieve an extra layer of obfuscation, the numerical values can be wrapped in
+the macro `N()` and all numeric variables (`int`, `long`, ...) can be wrapped in
+the macro `V()` to provide an extra layer of obfuscation for doing the
+calculation operations.
 
 And here is an example for using the value and variable wrappers:
 
 ```cpp
-int a;
+int a, b = N(6);
 V(a) = N(1);
 ```
 
@@ -241,15 +242,40 @@ wrapper is implemented, together with the comparison operators.
 The following control structures are made available for immediate use
 by the developers by means of macros, which expand into complex templated code.
 
+#### The `if` statement
+
+For checking the true-ness of an expression the framework offers the `IF` macro
+which has the following form:
+
+    `IF (expression)`
+    `....statements`
+    `ELSE`
+    `....other statements`
+    `ENDIF`
+
+where the `ELSE` is not mandator, but the `ENDIF` is, since it indicates the
+end of the `IF` blocks' statements.
+
+And here is an example for the usage of the `IF` macro.
+
+```cpp
+IF( V(a) == N(9) )
+     V(b) = a + N(5);
+ELSE
+     V(a) = N(9);
+     V(b) = a + b;
+ENDIF
+```
+
 #### The `for` statement
 
-The macro provided to imitate the `for` statmement is:
+The macro provided to imitate the `for` statement is:
 
   `FOR(initializer, condition, incrementer)`
   `.... statements`
   `ENDFOR`
 
-Please note, that since it is a macros, it should use `,` (comma) not the
+Please note, that since `FOR` is a macro, it should use `,` (comma) not the
 traditional `;` which is used in the standard C++ `for` loops, and do not forget
 to include your `initializer`, `condition` and `incrementer` in parentheses if
 they are expressions which have `,` (comma) in them.

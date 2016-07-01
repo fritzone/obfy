@@ -131,7 +131,7 @@ int main()
 
     std::cout << "Check:" << check_license1("Ferenc Deak", license.c_str()) << std::endl;
 
-    int b = 6, v=7;
+    int b = N(6), v=7;
 
     int a = 7;
     V(a) = V(a) - V(b);
