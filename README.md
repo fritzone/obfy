@@ -211,20 +211,32 @@ providing the obfuscating functionality
 then using the macro pair `OBF_BEGIN` and `OBF_END` as delimiters of the code
 sequences that will be using obfuscated expressions.
 
-If required, the numerical values can be wrapped in the macro `N()` the
-`const char*` values can be wrapped in the macro `TEXT()` and all simple
-variables can be wrapped in the macro `V()`.
+#### Value and numerical wrappers
 
-This is an example of using the `TEXT()` macro:
-
-```cpp
-auto str_wrapper = TEXT("This is a string");
-std::string s = str_wrapper.std_str();
-```
+The numerical values can be wrapped in the macro `N()` and all numeric variables
+(`int`, `long`, ...) can be wrapped in the macro `V()` to provide an extra layer
+of obfuscation.
 
 And here is an example for using the value and variable wrappers:
+
 ```cpp
+int a;
+V(a) = N(1);
 ```
+
+After executing the statement above, the value of `a` will be 1.
+
+The value wrappers implement a limited set of operations which you can use to
+change the value of the wrapped variable. These are the compound assignment
+operators: `+=`, `-=`, `*=`, `/=`, `%=`, `<<=`, `>>=`, `&=`, `|=`, `^=` and the
+post/pre-increment operations `--` and `++`. All of the binary operators `+`,
+`-`, `*`, `/`, `%`, `&`, `|`, `<<`, `>>` are also implemented so you can write
+`V(a) + N(1)` or `V(a) - V(b)`.
+
+Also, the assignment operator to a specific type and from a different value
+wrapper is implemented, together with the comparison operators.
+
+### Control structures of the framework
 
 The following control structures are made available for immediate use
 by the developers by means of macros, which expand into complex templated code.
@@ -233,11 +245,25 @@ by the developers by means of macros, which expand into complex templated code.
 
 The macro provided to imitate the `for` statmement is:
 
-  `FOR(initializer, condition ,incrementer)`
+  `FOR(initializer, condition, incrementer)`
+  `.... statements`
+  `ENDFOR`
 
 Please note, that since it is a macros, it should use `,` (comma) not the
-traditional `;` which is used in the standard C++ `for` loops.
+traditional `;` which is used in the standard C++ `for` loops, and do not forget
+to include your `initializer`, `condition` and `incrementer` in parentheses if
+they are expressions which have `,` (comma) in them.
 
+The `FOR` loops should be ended with and `ENDFOR` statement to signal the end of
+the structure.
+
+Here is a simple example for the `FOR` loop.
+
+```cpp
+FOR(V(a) = N(0), V(a) < N(10), V(a) += 1)
+   std::cout << V(a) << std::endl;
+ENDFOR
+```
 
 ### Discommodities of the framework
 

@@ -56,46 +56,6 @@ struct MetaRandom
     static const int value = MetaRandomGenerator<N + 1>::value % M;
 };
 
-// String Encryption, based on
-// "Malware related compile-time hacks with C++11" by LeFF
-// http://www.unknowncheats.me/forum/c-and-c/113715-compile-time-string-encryption.html
-
-template <int... Pack> struct IndexList {};
-template <typename IndexList, int Right> struct Append;
-template <int... Left, int Right> struct Append<IndexList<Left...>, Right> {using Result=IndexList<Left..., Right>; };
-template <int N> struct ConstructIndexList {
-    using Result = typename Append<typename ConstructIndexList<N - 1>::Result, N - 1>::Result;
-};
-template <> struct ConstructIndexList<0> { using Result = obf::IndexList<>; };
-#ifdef _MSC_VER
-#pragma warning(disable:4309)
-#endif
-static constexpr char xor_value = (MetaRandom<0, 0xFE>::value);
-constexpr char EncryptCharacter(const char Character, int Index) { return Character ^ (xor_value + Index); }
-
-template <typename IndexList> class crypted_string;
-template <std::size_t... L> class crypted_string<IndexList<L...> > {
-public:
-    constexpr explicit crypted_string(const char* const str) : value { EncryptCharacter(str[L], L)... } {}
-    std::string std_str() const { return decrypted(); }
-    char operator[] (std::size_t idx) const {return std_str()[idx];}
-private:
-    char value[sizeof...(L) + 1] = {0};
-    std::string decrypted() const
-    {
-        char decr[sizeof...(L) + 1] = {0};
-        for(std::size_t t = 0; t < sizeof...(L); t++)
-        {
-            decr[t] = value[t] ^ (xor_value + static_cast<char>(t) );
-        }
-        return std::string(decr);
-    }
-};
-
-#define TEXT(String) obf::crypted_string<obf::ConstructIndexList<sizeof(String)-1>::Result>(String)
-
-// done string encryption
-
 #define COMP_ASSIGNMENT_OPERATOR(x) \
     refholder<T>& operator x##= (const refholder<T>& ov) { v x##= ov.v; return *this;}  \
 /*    refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;}*/ \
@@ -107,13 +67,6 @@ private:
 #define COMPARISON_OPERATOR(x) \
     bool operator x (const T& ov) { return (v x ov); }
 
-#define DISABLE_BINARY_OPERATOR(x) \
-    refholder& operator x (const refholder<T>&);        \
-    refholder& operator x (const refholder<T>&&);       \
-    refholder& operator x (refholder<T>&&);             \
-    refholder& operator x (refholder<T>&);              \
-    refholder& operator x (const T&);                   \
-    refholder& operator x (const T&&)
 
 /* simple reference holder class, mostly for dealing with numbers */
 template <typename T>
@@ -123,6 +76,8 @@ public:
     /* Construction, destruction */
     refholder() = delete;
     refholder(T& pv) : v(pv) {}
+    refholder(T&&) = delete;
+
     ~refholder() = default;
 
     /* Assignment */
@@ -140,9 +95,14 @@ public:
     /* Conversion to the real type */
     operator T() {return v;}
 
-    /* Pre increment/decrement only */
+    /* Pre increment/decrement operators */
     refholder<T>& operator++() { ++ v; return *this; }
     refholder<T>& operator--() { -- v; return *this; }
+
+
+    /* post increment/decrement */
+    refholder<T> operator++(int) { refholder<T> rv(*this); operator ++(); return rv; }
+    refholder<T> operator--(int) { refholder<T> rv(*this); operator --(); return rv; }
 
     /* Compound assignments */
     COMP_ASSIGNMENT_OPERATOR(+)
@@ -160,23 +120,29 @@ private:
 
     /* The root of all evil */
     T& v;
-
-    /* All binary ops. disabled */
-    DISABLE_BINARY_OPERATOR(+);
-    DISABLE_BINARY_OPERATOR(-);
-    DISABLE_BINARY_OPERATOR(*);
-    DISABLE_BINARY_OPERATOR(/);
-    DISABLE_BINARY_OPERATOR(%);
-    DISABLE_BINARY_OPERATOR(&);
-    DISABLE_BINARY_OPERATOR(|);
-    DISABLE_BINARY_OPERATOR(<<);
-    DISABLE_BINARY_OPERATOR(>>);
-
-    /* Disable post increment/decrement */
-    refholder<T>& operator++(int);
-    refholder<T>& operator--(int);
-
 };
+
+/* Binary operators for the value wrappers */
+#define DEFINE_BINARY_OPERATOR(x) \
+template <class T> refholder<T> operator x (refholder<T>& ls, const T& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, T& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, T&& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, const T&& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, const refholder<T>&& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, refholder<T>&& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, refholder<T>& rs) {refholder<T> rv = ls; ls x##= rs; return rv; } \
+template <class T> refholder<T> operator x (refholder<T>& ls, const refholder<T>& rs) {refholder<T> rv = ls; ls x##= rs; return rv; }
+
+DEFINE_BINARY_OPERATOR(+)
+DEFINE_BINARY_OPERATOR(-)
+DEFINE_BINARY_OPERATOR(*)
+DEFINE_BINARY_OPERATOR(/)
+DEFINE_BINARY_OPERATOR(%)
+DEFINE_BINARY_OPERATOR(&)
+DEFINE_BINARY_OPERATOR(|)
+DEFINE_BINARY_OPERATOR(<<)
+DEFINE_BINARY_OPERATOR(>>)
+
 
 /* Helping stuff */
 
@@ -436,6 +402,8 @@ public:
     {
         CT retv;
         condition->run( reinterpret_cast<void*>(&retv) );
+        // this looks funny, however we cannot use the operator ==
+        // due to a visual C++ 2015 compiler bug, which fails to compile and crashes
         return equals(against,retv) ? next_step::ns_done : next_step::ns_continue;
     }
 

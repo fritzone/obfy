@@ -114,20 +114,6 @@ std::string generate_license(const char* user)
 int main()
 {
 
-    OBF_BEGIN
-      auto str = TEXT("This is a string");
-      std::string s = str.std_str();
-      std::cout << s;
-      auto l = s.length();
-      std::size_t i = 0;
-      FOR( V(i) = N(0), V(i) < V(l), i ++)
-          s[i] = N(65) ;
-      ENDIF
-
-      std::cout << s << std::endl;
-
-    OBF_END
-
 
     std::string s = generate_license("Ferenc Deak");
     std::string license = "";
@@ -144,19 +130,18 @@ int main()
     std::cout << "User:" << license  << std::endl;
 
     std::cout << "Check:" << check_license1("Ferenc Deak", license.c_str()) << std::endl;
-    auto s1 = TEXT("Nigga I done steal ya bike tooo") ;
 
-    std::cout << s[1] << std::endl;
+    int b = 6, v=7;
 
-    int a = 5, b = 6, v=7;
+    int a = 7;
+    V(a) = V(a) - V(b);
+    std::cout << "A=" << a << std::endl;
 
-    a += 7;
-    b += a;
-    a -= 7;
-    b -= 12;
+    FOR(V(a) = N(0), V(a) < N(10), V(a) ++)
+       std::cout << V(a) << std::endl;
+    ENDFOR
 
-    b = dummy(a);
-
+    std::cout << "A=" << a << std::endl;
 
     OBF_BEGIN
 
