@@ -98,11 +98,11 @@ private:
 
 #define COMP_ASSIGNMENT_OPERATOR(x) \
     refholder<T>& operator x##= (const refholder<T>& ov) { v x##= ov.v; return *this;}  \
-    refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;} \
+/*    refholder<T>& operator x##= (const refholder<T>&& ov) { v x##= ov.v; return *this;}*/ \
     refholder<T>& operator x##= (const T& ov) { v x##= ov; return *this;}               \
-    refholder<T>& operator x##= (const T&& ov) { v x##= ov; return *this;}              \
+/*    refholder<T>& operator x##= (const T&& ov) { v x##= ov; return *this;}           */   \
     refholder<T>& operator x##= (T& ov) { v x##= ov; return *this;}                     \
-    refholder<T>& operator x##= (T&& ov) { v x##= ov; return *this;}
+/*    refholder<T>& operator x##= (T&& ov) { v x##= ov; return *this;}*/
 
 #define COMPARISON_OPERATOR(x) \
     bool operator x (const T& ov) { return (v x ov); }
@@ -182,6 +182,8 @@ private:
 
 struct base_rvholder
 {
+    virtual ~base_rvholder() = default;
+
     template<class T>
     operator T () const
     {
@@ -194,6 +196,12 @@ struct base_rvholder
         return o == operator T ();
     }
 
+    template<class T>
+    bool equals(const T& o) const
+    {
+        return o == *reinterpret_cast<const T*>(get());
+    }
+
     virtual const void* get() const = 0;
 };
 
@@ -202,8 +210,8 @@ class rvholder : public base_rvholder
 {
 public:
     rvholder(T t, T c) :base_rvholder(), v(t), check(c) {}
-    ~rvholder() { if (v != check) throw 1; }
-    virtual const void* get() const {return reinterpret_cast<const void*>(&v);}
+    ~rvholder() = default;
+    virtual const void* get() const override {return reinterpret_cast<const void*>(&v);}
 private:
     T v;
     T check;
@@ -407,6 +415,8 @@ private:
 class case_instruction
 {
 public:
+    case_instruction() = default;
+    virtual ~case_instruction() = default;
     virtual next_step execute(const base_rvholder&) const = 0;
 };
 
@@ -417,19 +427,16 @@ public:
     template<class T>
     branch(T lambda) {condition.reset(new any_functor<T>(lambda));}
 
+    bool equals(const base_rvholder& rv, CT lv) const
+    {
+        return rv.equals(lv);
+    }
+
     virtual next_step execute(const base_rvholder& against) const override
     {
         CT retv;
-        condition->run( (void*)(&retv) );
-        bool confirmed = against.operator == (retv) ;
-        if(confirmed)
-        {
-            return next_step::ns_done;
-        }
-        else
-        {
-            return next_step::ns_continue;
-        }
+        condition->run( reinterpret_cast<void*>(&retv) );
+        return equals(against,retv) ? next_step::ns_done : next_step::ns_continue;
     }
 
 private:

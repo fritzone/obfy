@@ -113,6 +113,22 @@ std::string generate_license(const char* user)
 
 int main()
 {
+
+    OBF_BEGIN
+      auto str = TEXT("This is a string");
+      std::string s = str.std_str();
+      std::cout << s;
+      auto l = s.length();
+      std::size_t i = 0;
+      FOR( V(i) = N(0), V(i) < V(l), i ++)
+          s[i] = N(65) ;
+      ENDIF
+
+      std::cout << s << std::endl;
+
+    OBF_END
+
+
     std::string s = generate_license("Ferenc Deak");
     std::string license = "";
     int current_size = 0;
