@@ -12,7 +12,7 @@ set(SOURCE_FILES instr.cpp)
 add_library(obfy ${SOURCE_FILES})
 
 if(WIN32)
-  set(Boost_USE_STATIC_LIBS ON)	 	
+  set(Boost_USE_STATIC_LIBS ON)
 endif()
 
 add_executable(obfy_test main.cpp)

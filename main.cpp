@@ -111,8 +111,69 @@ std::string generate_license(const char* user)
     return std::string(result);
 }
 
+int stuffer()
+{
+    return 1;
+}
+
+struct X
+{
+    int f;
+};
+
 int main()
 {
+
+    int a = 7;
+
+
+
+    OBF_BEGIN
+
+    FOR(a = 0, a < 10, a++)
+       std::cout << "counter=" << a << std::endl;
+       IF(a == 1)
+            BREAK
+       ENDIF
+    ENDFOR
+
+    int xs[12] = {0};
+    V(xs[1]) = N(2);
+    V(xs[1]) ++;
+    int z = V(xs[1]) + N(9);
+
+
+    SECTION(SomeSection)
+
+        std::cout<< "Section entered" << std::endl;
+
+    ENDSECTION()
+
+
+
+    std::cout << xs[1] << std::endl;
+
+//    FOR(a = 0, a < 5, a++)
+//       std::cout << "counter before=" << a << std::endl;
+//       IF(a == 2)
+//            CONTINUE
+//       ENDIF
+//       std::cout << "counter after=" << a << std::endl;
+//    ENDFOR
+
+    a = 0;
+    WHILE(a < 5)
+        std::cout << "counter before=" << a << std::endl;
+        IF(a == 2)
+             a++;
+             CONTINUE
+        ENDIF
+        std::cout << "counter after=" << a << std::endl;
+        a++;
+    ENDFOR
+
+
+
 
 
     std::string s = generate_license("Ferenc Deak");
@@ -131,32 +192,37 @@ int main()
 
     std::cout << "Check:" << check_license1("Ferenc Deak", license.c_str()) << std::endl;
 
-    int b = N(6), v=7;
+    int b = N(96), v=7;
 
-    int a = 7;
+
+
+    REPEAT
+        std::cout <<"LLPP:" << a << std::endl;
+        ++a;
+    UNTIL (a < 12)
+
+    V(a) = N(1);
+    do
+    { std::cout << "LLXX:" << a << std::endl;
+        ++a;
+    }while(a < 12);
+
+
+    IF (a == 5)
+        RETURN (77)
+    ENDIF
+
+
+
     V(a) = V(a) - V(b);
     std::cout << "A=" << a << std::endl;
 
-    FOR(V(a) = N(0), V(a) < N(10), V(a) ++)
-       std::cout << V(a) << std::endl;
-    ENDFOR
 
     std::cout << "A=" << a << std::endl;
 
-    OBF_BEGIN
 
-        IF (a == 5)
-            IF (b == 8)
-                RETURN (N(77))
-            ENDIF
-        ENDIF
 
-        V(a) = N(1);
 
-        REPEAT
-            std::cout << a << std::endl;
-            ++ V(a);
-        UNTIL(V(a) != N(12));
 
         a = 6;
 
@@ -174,7 +240,7 @@ int main()
         ENDCASE
 
 
-    OBF_END
+
 
     std::cout << "BEFOR:" << a<< std::endl;
 
@@ -216,6 +282,7 @@ int main()
         std::cout << "INFOR:" << a <<" B=" << b<< std::endl;
     ENDFOR
 
+            OBF_END
     return 0;
 
 }

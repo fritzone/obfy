@@ -190,7 +190,8 @@ enum class next_step
     ns_break,
     ns_continue,
     ns_return,
-    ns_done
+    ns_done,
+    ns_unused
 };
 
 struct next_step_functor_base
@@ -200,8 +201,8 @@ struct next_step_functor_base
 };
 
 template <class T>
-struct next_step_functor final : public next_step_functor_base {
-
+struct next_step_functor final : public next_step_functor_base
+{
     next_step_functor(T r) : runner(r) {}
     virtual next_step run() {return runner();}
 
@@ -297,9 +298,17 @@ public:
     {
         for( initializer->run(); condition->run(); increment->run())
         {
-            next_step c = body->run();
-            if(c == next_step::ns_break) break;
-            if(c == next_step::ns_continue) continue;
+            try
+            {
+                next_step c = body->run();
+                if(c == next_step::ns_break) break;
+                if(c == next_step::ns_continue) continue;
+            }
+            catch(next_step& c)
+            {
+                if(c == next_step::ns_break) break;
+                if(c == next_step::ns_continue) continue;
+            }
         }
     }
 
@@ -328,9 +337,17 @@ public:
     {
         while( condition->run() )
         {
-            next_step c = body->run();
-            if(c == next_step::ns_break) break;
-            if(c == next_step::ns_continue) continue;
+            try
+            {
+                next_step c = body->run();
+                if(c == next_step::ns_break) break;
+                if(c == next_step::ns_continue) continue;
+            }
+            catch(next_step& c)
+            {
+                if(c == next_step::ns_break) break;
+                if(c == next_step::ns_continue) continue;
+            }
         }
     }
 
@@ -603,36 +620,65 @@ template <> struct Num<int,1>
     int v = value;
 };
 
+#if defined _DEBUG || defined DEBUG || defined OBF_DEBUG
+
+#define IF(x) if(x) {
+#define ELSE } else
+#define ENDIF }
+
+#define FOR(init,cond,inc) for(init;cond;inc) {
+#define ENDFOR }
+
+#define WHILE(x) while(x) {
+#define ENDWHILE }
+
+#define REPEAT   do {
+#define UNTIL(x) } while ((x));
+
+
+#else
+#define _JOIN(a,b) a##b
 #define N(a) (obf::Num<decltype(a), obf::MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ obf::MetaRandom<__COUNTER__ - 1, 4096>::value)
 #define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
-#define V(a) ([&](){obf::extra_chooser<decltype(a), obf::MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _ec_##__COUNTER__(a);\
+#define V(a) ([&](){obf::extra_chooser<decltype(a), obf::MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
             return obf::stream_helper();}() << a)
-#define IF(x) { std::shared_ptr<obf::base_rvholder> rvlocal; obf::if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
-#define ELSE return obf::next_step::ns_done;}).set_else( [&]() {
-#define FOR(init,cond,inc) { std::shared_ptr<obf::base_rvholder> rvlocal; obf::for_wrapper( [&]()\
-           {init;return obf::next_step::ns_done;}, [&]()->bool{return cond;}, [&](){inc;return obf::next_step::ns_done;}).set_body( [&]() {
-#define END return obf::next_step::ns_done;}).run(); }
-#define ENDIF END
-#define ENDWHILE END
-#define ENDFOR END
-#define BREAK return obf::next_step::ns_break;
-#define RETURN(x) rvlocal.reset(new obf::rvholder<decltype(x)>(x,x));  throw rvlocal;
-#define CONTINUE return obf::next_step::ns_continue;
-#define WHILE(x) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
-#define REPEAT { std::shared_ptr<obf::base_rvholder> rvlocal; obf::repeat_wrapper().set_body( [&]() {
-#define UNTIL(x) return obf::next_step::ns_done;}).set_condition([&]()->bool{ return (x); }).run(); }
-#define OBF_BEGIN try { std::shared_ptr<obf::base_rvholder> rvlocal;
-#define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; }
 
-#define CASE(a) {std::shared_ptr<obf::base_rvholder> rvlocal; obf::case_wrapper<decltype(a)>(a).
-#define ENDCASE run(); }
-#define WHEN(c) add_entry(obf::branch<decltype(c)>( [](){return (c);})).
-#define DO add_entry( obf::body([](){
+#define FOR(init,cond,inc) { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::for_wrapper( [&](){(init); return __crv; },\
+           [&]()->bool{return (cond); }, \
+           [&](){inc;return __crv;}).set_body( [&]() {
+#define ENDFOR return __crv;}).run(); }
+
+#define END return __crv;}).run(); }
+
+#define IF(x) {std::shared_ptr<obf::base_rvholder> __rvlocal; obf::if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
+#define ELSE return __crv;}).set_else( [&]() {
+#define ENDIF END
+
+#define WHILE(x) {std::shared_ptr<obf::base_rvholder> __rvlocal; obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
+#define ENDWHILE END
+
+#define BREAK __crv = obf::next_step::ns_break; throw __crv;
+#define CONTINUE __crv = obf::next_step::ns_continue; throw __crv;
+
+#define RETURN(x) __rvlocal.reset(new obf::rvholder<decltype(x)>(x,x));  throw __rvlocal;
+
+#define REPEAT { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::repeat_wrapper().set_body( [&]() {
+#define UNTIL(x) return __crv;}).set_condition([&]()->bool{ return (x); }).run(); }
+
+#define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
+#define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
+
+#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::case_wrapper<decltype(a)>(a).
+#define ENDCASE run(); } catch(obf::next_step& cv) {}
+#define WHEN(c) add_entry(obf::branch<decltype(c)>( [&](){return (c);})).
+#define DO add_entry( obf::body([&](){
 #define DONE return obf::next_step::ns_continue;})).
 #define OR join().
+
+#endif
 
 } // namespace obf
 
