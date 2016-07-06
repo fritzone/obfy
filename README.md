@@ -354,7 +354,63 @@ In case the debugging mode is active, the `IF`/`ELSE`/`ENDIF` macros are defined
 #define ENDIF  }
 ```
 
+##### The `CASE` statement
 
+When programming in c++ the `switch`-`case` statement comes handy when there is a need to avoid long chains of `if` statements. The obfuscation framework provides a similar construct, although not exactly a functional and syntactical copy of the original `switch`-`case` construct.
+
+Here is the `CASE` statement:
+
+    CASE (<variable>)
+        WHEN(<value>) [OR WHEN(<other_value>)] DO
+        ....statements
+        ....[BREAK]
+        DONE
+        [DEFAULT
+        ....statements
+        DONE]
+    ENDCASE
+
+The functionality is very similar to the well known `switch`-`case` construct, the main differences are:
+
+1. It is possible to use non-numeric, non-constant values (variables and strings) for the `WHEN` due to the fact that all of the `CASE` statement is wrapped up in a templated, lambdaized construct. Be careful with this when using the debugging mode of the library.
+2. It is possible to have multiple conditions for a `WHEN` label joined     together with `OR`.
+
+The fall through behaviour of the `switch` construct which is familiar to c++ programmers was kept, so there is a need to put in a `BREAK` statement if you wish for the operation to stop after entering a branch.
+
+And here is an example for the `CASE` statement:
+
+```cpp
+    std::string something = "D";
+    std::string something_else = "D";
+    CASE (something)
+        WHEN("A") OR WHEN("B") DO
+            std::cout <<"Hurra, something is " << something << std::endl;
+            BREAK;
+        DONE
+        WHEN("C") DO
+            std::cout <<"Too bad, something is " << something << std::endl;
+            BREAK;
+        DONE
+        WHEN(something_else) DO
+            std::cout <<"Interesing, something is " << something_else << std::endl;
+            BREAK;
+        DONE
+        DEFAULT
+            std::cout << "something is neither A, B or C, but:" << something << std::endl;
+        DONE
+    ENDCASE
+```
+In case the framework is used in debugging mode the macros expand to the following statements:
+
+```cpp
+#define CASE(a) switch (a) {
+#define ENDCASE }
+#define WHEN(c) case c:
+#define DO {
+#define DONE }
+#define OR
+#define DEFAULT default:
+```
 
 ### Discommodities of the framework
 

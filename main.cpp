@@ -1,6 +1,8 @@
 #include <iostream>
 #include <stdio.h>
 
+#define OBF_DEBUG
+
 #include "instr.h"
 #include <type_traits>
 #include <iostream>
@@ -130,6 +132,37 @@ int main()
 
     OBF_BEGIN
 
+
+    a = 5;
+
+//    std::string something = "D";
+//    std::string something_else = "D";
+
+//    CASE (something)
+
+//        WHEN("A") OR WHEN("B") DO
+//            std::cout <<"Hurra, something is " << something << std::endl;
+//            BREAK;
+//        DONE
+
+//        WHEN("C") DO
+//            std::cout <<"Too bad, something is " << something << std::endl;
+//            BREAK;
+//        DONE
+
+//        WHEN(something_else) DO
+//            std::cout <<"Interesing, something is " << something_else << std::endl;
+//            BREAK;
+//        DONE
+
+//        DEFAULT
+//            std::cout << "something is neither A, B or C, but:" << something << std::endl;
+//        DONE
+
+//    ENDCASE
+
+
+
     FOR(a = 0, a < 10, a++)
        std::cout << "counter=" << a << std::endl;
        IF(a == 1)
@@ -141,15 +174,6 @@ int main()
     V(xs[1]) = N(2);
     V(xs[1]) ++;
     int z = V(xs[1]) + N(9);
-
-
-    SECTION(SomeSection)
-
-        std::cout<< "Section entered" << std::endl;
-
-    ENDSECTION()
-
-
 
     std::cout << xs[1] << std::endl;
 

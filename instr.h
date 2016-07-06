@@ -447,11 +447,17 @@ template<class CT>
 class case_wrapper final
 {
 public:
-    explicit case_wrapper(const CT& v) : check(v) {}
+    explicit case_wrapper(const CT& v) : check(v), default_step(nullptr) {}
 
     case_wrapper& add_entry(const case_instruction& lambda_holder)
     {
         steps.push_back(&lambda_holder);
+        return *this;
+    }
+
+    case_wrapper& add_default(const case_instruction& lambda_holder)
+    {
+        default_step = &lambda_holder;
         return *this;
     }
 
@@ -463,6 +469,7 @@ public:
     void run()
     {
         auto it = steps.begin();
+        bool at_least_one_execeuted = false;
         while(it != steps.end())
         {
             bool increased = false;
@@ -493,6 +500,7 @@ public:
                         if(dynamic_cast<const body*>(*it))
                         {
                             next_step leave_switch = (*it)->execute(rvholder<CT>(check,check));
+                            at_least_one_execeuted = true;
                             if(leave_switch == next_step::ns_break)
                             {
                                 return;
@@ -515,11 +523,17 @@ public:
                 ++it;
             }
         }
+
+        if(default_step)
+        {
+            default_step->execute(rvholder<CT>(check,check));
+        }
     }
 
 private:
     std::vector<const case_instruction*> steps;
     CT check;
+    const case_instruction* default_step;
 };
 
 /* syntactic sugar */
@@ -622,8 +636,19 @@ template <> struct Num<int,1>
 
 #if defined _DEBUG || defined DEBUG || defined OBF_DEBUG
 
+#define OBF_BEGIN
+#define OBF_END
+
+#define V(x) x
+#define N(x) x
+
+#define RETURN(x) return x;
+
+#define BREAK break;
+#define CONTINUE continue;
+
 #define IF(x) if(x) {
-#define ELSE } else
+#define ELSE } else {
 #define ENDIF }
 
 #define FOR(init,cond,inc) for(init;cond;inc) {
@@ -634,6 +659,15 @@ template <> struct Num<int,1>
 
 #define REPEAT   do {
 #define UNTIL(x) } while ((x));
+
+#define CASE(a) switch (a) {
+#define ENDCASE }
+#define WHEN(c) case c:
+#define DO {
+#define DONE }
+#define OR
+#define DEFAULT default:
+
 
 
 #else
@@ -671,12 +705,13 @@ DEFINE_EXTRA(2, extra_addition);
 #define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
 
-#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::case_wrapper<decltype(a)>(a).
+#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; auto __avholder = a; obf::case_wrapper<decltype(a)>(a).
 #define ENDCASE run(); } catch(obf::next_step& cv) {}
-#define WHEN(c) add_entry(obf::branch<decltype(c)>( [&](){return (c);})).
+#define WHEN(c) add_entry(obf::branch<decltype(__avholder)>( [&]() -> decltype(__avholder) { decltype(__avholder) __c = (c); return __c;} )).
 #define DO add_entry( obf::body([&](){
 #define DONE return obf::next_step::ns_continue;})).
 #define OR join().
+#define DEFAULT add_default(obf::body([&](){
 
 #endif
 
