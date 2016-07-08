@@ -311,6 +311,21 @@ ENDFOR
 
 This loop will print `counter=0` and `counter=1` then it will leave the body of the loop, continuing the execution after the `ENDFOR`.
 
+##### The `RETURN` statement
+
+As expected, the `RETURN` statement returns the execution of the current function and will return the specified value to the caller function. Here is an example of returning 42 from a function:
+
+```cpp
+int some_fun()
+{
+OBF_BEGIN
+    RETURN(42)
+OBF_END
+}
+```
+
+With the introduction of `RETURN`, an important issue arose: The obfuscation framework does not support the usage of `void` functions
+
 #### Decision making
 
 When there is a need to take a decision, the obfuscated framework offers the familiar `if`-`then`-`else` construct for the developers.
@@ -414,7 +429,7 @@ In case the framework is used in debugging mode the macros expand to the followi
 
 ### Discommodities of the framework
 
-Since
+Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. 
 
 
 ### References

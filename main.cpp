@@ -1,7 +1,6 @@
 #include <iostream>
 #include <stdio.h>
 
-#define OBF_DEBUG
 
 #include "instr.h"
 #include <type_traits>
@@ -123,11 +122,25 @@ struct X
     int f;
 };
 
+int method()
+{
+    OBF_BEGIN
+        RETURN(1)
+    OBF_END
+}
+
+int some_fun()
+{
+OBF_BEGIN
+    RETURN(42)
+OBF_END
+}
+
 int main()
 {
 
-    int a = 7;
-
+    int a = some_fun();
+    std::cout << a;
 
 
     OBF_BEGIN
