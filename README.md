@@ -12,7 +12,7 @@ This article will provide a short introduction to illustrate a very simple and n
 
 The naive licensing algorithm is a very simple implementation of checking the validity of a license associated with the name of the user who has purchased the associated software. It is NOT an industrial strength algorithm, it has just demonstrative power, while trying to provide insight on the actual responsibilities of a real licensing algorithm.
 
-Since the license checking code is usually shipped with the software product in compiled form, I'll put in here both the generated code (in Intel x86 assembly) since that is what the crackers will see after a successful disassembly of the executable but also the C++ code for the licensing algorithm. In order to not to pollute the precious paper space with unintelligible binary code I will restrain myself to include only the relevant bits of the code, with regard to the parts which naively determines whether a supplied license is valid or not, together with the C++ code, which was used to generate the binary code. 
+Since the license checking code is usually shipped with the software product in compiled form, I'll put in here both the generated code (in Intel x86 assembly) since that is what the crackers will see after a successful disassembly of the executable but also the C++ code for the licensing algorithm. In order to not to pollute the precious paper space with unintelligible binary code I will restrain myself to include only the relevant bits of the code, with regard to the parts which naively determines whether a supplied license is valid or not, together with the C++ code, which was used to generate the binary code.
 
 The code was compiled using Microsoft Visual C++ (2015), in Release mode with optimization settings to favour a smaller executable, and I also have used the built in debugger of the VS IDE, to have a proper matching of the generated code with the source, to facilitate the educational aspect of this article.
 
@@ -46,7 +46,7 @@ bool check_license(const char* user, const char* users_license)
 }
 ```
 
-The license which this method validates comes in the form of the following "ABCD-EFGH-IJKL-MNOP" and there is an associated `generate_license` method which will be presented as an appendix to this article. 
+The license which this method validates comes in the form of the following "ABCD-EFGH-IJKL-MNOP" and there is an associated `generate_license` method which will be presented as an appendix to this article.
 
 Also, the naivety of this method is easily exposed by using the very proper name of `check_license` which immediately reveals to the up-to-be attacker where to look for the code checking the ... license. If you want to make harder for the attacker the identification of the license checking method I'd recommend either to use some irrelevant names or just strip all symbols from the executable as part of the release process.
 
@@ -138,7 +138,7 @@ The basic usage of the framework boils down to including the header file providi
 
 then using the macro pair `OBF_BEGIN` and `OBF_END` as delimiters of the code sequences that will be using obfuscated expressions.
 
-For a more detailed understanding, the `OBF_BEGIN` and `OBF_END` macros declare a `try`-`catch` block, which has support for returning values from the obfuscated current code sequence, and also provides support for basic control flow modifications such as the usage of `continue` and `break` emulator macros `CONTINUE` and `BREAK`.
+For a more under the hood view of the framework, the `OBF_BEGIN` and `OBF_END` macros declare a `try`-`catch` block, which has support for returning values from the obfuscated current code sequence, and also provides support for basic control flow modifications such as the usage of `continue` and `break` emulator macros `CONTINUE` and `BREAK`.
 
 #### Value and numerical wrappers
 
@@ -159,11 +159,76 @@ The value wrappers implement a limited set of operations which you can use to ch
 
 Also, the assignment operator to a specific type and from a different value wrapper is implemented, together with the comparison operators.
 
+As the name implies, the value wrappers will wrap values by offering a behaviour similar to the usage of simple values, so be aware, that variables which are `const` values can be wrapped into the `V()` wrapper however as with real const variables, you cannot assign to them. So for example the following code will not compile:
+
+```cpp
+    const char* t = "ABC";
+    if( V(t[1]) == 'B')
+    {
+        V( t[1] ) = 'D';
+    }
+```
+
+And the following 
+
+```cpp
+    char* t = "ABC";
+    if( V(t[1]) == 'B')
+    {
+        V( t[1] ) = 'D';
+    }
+```
+
+will be undefined behaviour since the compiler highly probably will allocate the string `"ABC"` in a constant memory area. To work with this kind of data always use `char[]` instead of `char*`.
+
 ### Control structures of the framework
 
-The following control structures are made available for immediate use by the developers by means of macros, which expand into complex templated code.
+The basic control structures which are familiar from C++ are made available for immediate use by the developers by means of macros, which expand into complex templated code.
 
-They are meant to provide the same functionality as the standard c++ keyword they are replacing, and if the framework is compiled in DEBUG mode, most of them actually expand to the c++ control structure itself.
+They are meant to provide the same functionality as the standard c++ keyword they are emulating, and if the framework is compiled in DEBUG mode, most of them actually expand to the c++ control structure itself.
+
+#### Decision making
+
+When there is a need in the application to take a decision based on the value of a specific expression, the obfuscated framework offers the familiar `if`-`then`-`else` statement for the developers in the form of the `IF`-`ELSE`-`ENDIF` construct.
+
+##### The `IF` statement
+
+For checking the true-ness of an expression the framework offers the `IF` macro which has the following form:
+
+    IF (expression)
+    ....statements
+    ELSE
+    ....other statements
+    ENDIF
+
+where the `ELSE` is not mandatory, but the `ENDIF` is, since it indicates the end of the `IF` blocks' statements.
+
+And here is an example for the usage of the `IF` macro.
+
+```cpp
+IF( V(a) == N(9) )
+     V(b) = a + N(5);
+ELSE
+     V(a) = N(9);
+     V(b) = a + b;
+ENDIF
+```
+
+Due to the way the `IF` macro is defined, it is not required to create a new scope between the `IF` and `ENDIF`, it is automatically defined and all variables declared in the statements between `IF` and `ENDIF` are destroyed.
+
+Since the evaluation of the `expression` is bound to the execution of a hidden (well at least from the outer world) lambda unfortunately it is not possible to declare variables in the `expression` so the following expression:
+
+    IF( int x = some_function() )
+
+is not valid, and will yield a compiler error. This is partially intentional, since it gives that extra layer of obfuscation required to hide the operations done on a variable in a nameless lambda somewhere deep in the code.
+
+In case the debugging mode is active, the `IF`-`ELSE`-`ENDIF` macros are defined to expand to the following statements:
+
+```cpp
+#define IF(x)  if(x) {
+#define ELSE   } else {
+#define ENDIF  }
+```
 
 #### Support for looping
 
@@ -189,13 +254,13 @@ FOR(V(a) = N(0), V(a) < N(10), V(a) += 1)
 ENDFOR
 ```
 
-The same restriction concerning the variable declaration in the `initializer` as in the case of hte `IF` applies for the FOR macro too, so it is not valid to write:
+The same restriction concerning the variable declaration in the `initializer` as in the case of the `IF` applies for the FOR macro too, so it is not valid to write:
 
     FOR(int x=0; x<10; x++)
 
 and the reasons are again the same as presented above.
 
-In case of a debugging session the `FOR`/`ENDFOR` macros expand to the following:
+In case of a debugging session the `FOR`-`ENDFOR` macros expand to the following:
 
 ```cpp
 #define FOR(init,cond,inc) for(init;cond;inc) {
@@ -222,6 +287,8 @@ Here is an example for the `WHILE`:
     ENDWHILE
 ```
 
+Unfortunately the `WHILE` loop also has the same restrictions as the `IF`: you cannot declare a variable in its condition.
+
 In case the compilation is done in debugging mode, the `WHILE` evaluates to:
 
 ```cpp
@@ -231,17 +298,17 @@ In case the compilation is done in debugging mode, the `WHILE` evaluates to:
 
 ##### The `REPEAT` - `UNTIL` construct
 
-Due to the complexity of the solution, the familiar `do` - `while` construct of the c++ language had to be altered a bit, since the `WHILE` "keyword" was already taken for the benefit of the `while` loop, so I borrowed the familiar to some repeat-until construct to achieve this goal.
+Due to the complexity of the solution, the familiar `do` - `while` construct of the C++ language had to be altered a bit, since the `WHILE` "keyword" was already taken for the benefit of the `while` loop, so I borrowed the `repeat` - `until` keywords to achieve this goal.
 
-This is the syntax of the `REPEAT` - `UNTIL` construct:
+This is the syntax of the `REPEAT`-`UNTIL` construct:
 
     REPEAT
     ....statements
     UNTIL( expression )
 
-This will execute the `statements` at least once, and then depending on the value of the `expression` either will continue the execution, or will stop and exit the loop. If the expression is `true` it will continue the execution from the beginning of the loop, if it is `false` it will stop the execution and exit the loop. 
+This will execute the `statements` at least once, and then depending on the value of the `expression` either will continue the execution, or will stop and exit the loop. If the expression is `true` it will continue the execution from the beginning of the loop, if it is `false` it will stop the execution and exit the loop.
 
-Please note, this is contradictory to the `repeat` - `until` logic offered by the Pascal language (which chose to continue the looping on a `false` expression), and it is similar the way the c++ language (and other similar languages) resolves the `do` - `while` looping.
+Please note, this is contradictory to the `repeat` - `until` logic offered by the Pascal language (which chose to continue the looping on a `false` expression), and it is similar the way the C++ language (and other similar languages) resolves the `do` - `while` looping.
 
 And here is an example:
 
@@ -250,7 +317,7 @@ And here is an example:
         ++ V(a);
     UNTIL( V(a) != N(12) )
 
-In case of debugging, the  `REPEAT` - `UNTIL` construct expands to the following:
+In case of debugging, the  `REPEAT`-`UNTIL` construct expands to the following:
 
 ```cpp
 #define REPEAT   do {
@@ -259,11 +326,11 @@ In case of debugging, the  `REPEAT` - `UNTIL` construct expands to the following
 
 #### Altering the control flow of the application
 
-Sometimes there is a need to alter the execution flow of a loop, c++ has support for this operation by providing the `continue` and `break` statements. The framework offers the `CONTINUE` and `BREAK` macros to achieve this goal.
+Sometimes there is a need to alter the execution flow of a loop, C++ has support for this operation by providing the `continue` and `break` statements. The framework offers the `CONTINUE` and `BREAK` macros to achieve this goal.
 
 ##### The `CONTINUE` statement
 
-The `CONTINUE` statement will skip all statements that follow him in the body of the loop, thus altering the flow of the application. 
+The `CONTINUE` statement will skip all statements that follow him in the body of the loop, thus altering the flow of the application.
 
 Here is an example for the `CONTINUE` used in a `FOR` loop:
 
@@ -326,49 +393,6 @@ OBF_END
 
 With the introduction of `RETURN`, an important issue arose: The obfuscation framework does not support the usage of `void` functions
 
-#### Decision making
-
-When there is a need to take a decision, the obfuscated framework offers the familiar `if`-`then`-`else` construct for the developers.
-
-##### The `IF` statement
-
-For checking the true-ness of an expression the framework offers the `IF` macro which has the following form:
-
-    IF (expression)
-    ....statements
-    ELSE
-    ....other statements
-    ENDIF
-
-where the `ELSE` is not mandatory, but the `ENDIF` is, since it indicates the end of the `IF` blocks' statements.
-
-And here is an example for the usage of the `IF` macro.
-
-```cpp
-IF( V(a) == N(9) )
-     V(b) = a + N(5);
-ELSE
-     V(a) = N(9);
-     V(b) = a + b;
-ENDIF
-```
-
-Due to the way the `IF` macro is defined, it is not required to create a new scope between the `IF` and `ENDIF`, it is automatically defined and all variables declared in the statements between `IF` and `ENDIF` are destroyed.
-
-Since the evaluation of the `expression` is bound to the execution of a hidden (well at least from the outer world) lambda unfortunately it is not possible to declare variables in the `expression` so the following expression:
-
-    IF( int x = some_function() )
-
-is not valid, and will yield a compiler error. This is partially intentional, since it gives that extra layer of obfuscation required to hide the operations done on a variable in a nameless lambda somewhere deep in the code.
-
-In case the debugging mode is active, the `IF`/`ELSE`/`ENDIF` macros are defined to expand to the following statements:
-
-```cpp
-#define IF(x)  if(x) {
-#define ELSE   } else {
-#define ENDIF  }
-```
-
 ##### The `CASE` statement
 
 When programming in c++ the `switch`-`case` statement comes handy when there is a need to avoid long chains of `if` statements. The obfuscation framework provides a similar construct, although not exactly a functional and syntactical copy of the original `switch`-`case` construct.
@@ -387,8 +411,8 @@ Here is the `CASE` statement:
 
 The functionality is very similar to the well known `switch`-`case` construct, the main differences are:
 
-1. It is possible to use non-numeric, non-constant values (variables and strings) for the `WHEN` due to the fact that all of the `CASE` statement is wrapped up in a templated, lambdaized construct. Be careful with this when using the debugging mode of the library.
-2. It is possible to have multiple conditions for a `WHEN` label joined     together with `OR`.
+1. It is possible to use non-numeric, non-constant values (variables and strings) for the `WHEN` due to the fact that all of the `CASE` statement is wrapped up in a templated, lambdaized well hidden from the outside world, construct. Be careful with this extra feature when using the debugging mode of the library because the `CASE` macro expands to the standard `case` keyword.
+2. It is possible to have multiple conditions for a `WHEN` label joined together with `OR`.
 
 The fall through behaviour of the `switch` construct which is familiar to c++ programmers was kept, so there is a need to put in a `BREAK` statement if you wish for the operation to stop after entering a branch.
 
@@ -407,11 +431,11 @@ And here is an example for the `CASE` statement:
             BREAK;
         DONE
         WHEN(something_else) DO
-            std::cout <<"Interesing, something is " << something_else << std::endl;
+            std::cout <<"Interesting, something is " << something_else << std::endl;
             BREAK;
         DONE
         DEFAULT
-            std::cout << "something is neither A, B or C, but:" << something << std::endl;
+            std::cout << "something is neither A, B or C, but:" << something <<std::endl;
         DONE
     ENDCASE
 ```
@@ -427,11 +451,20 @@ In case the framework is used in debugging mode the macros expand to the followi
 #define DEFAULT default:
 ```
 
-### Discommodities of the framework
+# The naive licensing algorithm revisited
 
-Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. 
+Now, that we are aware of a library that offers code obfuscation without too much headaches from our side (at least, this was the intention of the author) let's re-consider the implementation of the naive licensing algorithm using these new terms. So here it comes:
 
+# Discommodities of the framework
 
-### References
+Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. This is intentionally like this, because of the need to have familiar words that a developer instantly can connect to, and also to subscribe to the C++ rule, that macros should be uppercase.
+
+This brings us back to the swampy area of C++ and macros. There are several voices whispering loudly that macros have nothing to do in a C++ code, and there are several voices echoing back that macros if wisely used can help C++ code as well as good old style C. I personally have nothing against the wise use of macros, indeed they came to be very helpful while developing this framework.
+
+# References
 
 [Andrivet] - Random Generator by Sebastien Andrivet - https://github.com/andrivet/ADVobfuscator
+
+# license
+
+The library is a header only library, released in the public domain under the MIT license.

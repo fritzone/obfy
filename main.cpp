@@ -51,12 +51,12 @@ bool check_license1(const char* user, const char* users_license)
     OBF_BEGIN
     std::string license;
     size_t ll = strlen(users_license);
-    size_t l = strlen(user), lic_ctr = 0;
+    size_t l = strlen(user), lic_ctr = N(0);
 
-    size_t add = 0, i =0;
+    size_t add = N(0), i =N(0);
 
-    FOR (i = 0, i < ll, i++)
-        IF (users_license[i] != '-')
+    FOR (V(i) = N(0), V(i) < V(ll), V(i)++)
+        IF ( V(users_license[i]) != N(45) )
             license += users_license[i];
         ENDIF
     ENDFOR
@@ -66,8 +66,8 @@ bool check_license1(const char* user, const char* users_license)
         size_t i = lic_ctr;
         V(i) %= l;
         int current = 0;
-        WHILE(i < l)
-            V(current) += user[i ++];
+        WHILE(V(i) < V(l) )
+            V(current) += user[V(i)++];
         ENDWHILE
         V(current) += V(add);
         ++V(add);
@@ -199,15 +199,15 @@ int main()
 //    ENDFOR
 
     a = 0;
-    WHILE(a < 5)
+    WHILE( some_fun() )
         std::cout << "counter before=" << a << std::endl;
         IF(a == 2)
              a++;
-             CONTINUE
+             BREAK;
         ENDIF
         std::cout << "counter after=" << a << std::endl;
         a++;
-    ENDFOR
+    ENDWHILE
 
 
 
@@ -232,13 +232,12 @@ int main()
     int b = N(96), v=7;
 
 
-
     REPEAT
-        std::cout <<"LLPP:" << a << std::endl;
+        std::cout <<"LLPaP:" << a << std::endl;
+        BREAK;
         ++a;
     UNTIL (a < 12)
 
-    V(a) = N(1);
     do
     { std::cout << "LLXX:" << a << std::endl;
         ++a;
@@ -297,9 +296,7 @@ int main()
     WHILE( V(a)  < N(10) )
 
         std::cout << "IN:" << a<< std::endl;
-
-
-         v = V(a);
+        v = V(a);
 
         V(a) += N(1);
     ENDWHILE
@@ -319,7 +316,17 @@ int main()
         std::cout << "INFOR:" << a <<" B=" << b<< std::endl;
     ENDFOR
 
-            OBF_END
+    const int ssx=66;
+    V(a) = V(ssx);
+    int x = N(5) - V(a);
+    std::cout << x;
+
+    if (V(a) == 66)
+    {
+        std::cout << "\nVA is 66";
+    }
+
+    OBF_END
     return 0;
 
 }

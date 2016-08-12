@@ -1,3 +1,24 @@
+/*
+ * Copyright (c) 2016, Ferenc Deak
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ **/
+
 #ifndef INSTR_H
 #define INSTR_H
 
@@ -120,6 +141,28 @@ private:
 
     /* The root of all evil */
     T& v;
+};
+
+
+/* simple reference holder class, for holding reference of constant variables */
+template <typename T>
+class refholder <const T> final
+{
+public:
+    /* Construction, destruction */
+    refholder() = delete;
+    refholder(const T& pv) : v(pv) {}
+    refholder(T&&) = delete;
+
+    ~refholder() = default;
+
+    /* Conversion to the real type */
+    operator const T() {return v;}
+
+private:
+
+    /* The root of all evil */
+    const T& v;
 };
 
 /* Binary operators for the value wrappers */
@@ -260,9 +303,15 @@ public:
     {
         do
         {
-            next_step c = body->run();
-            if(c == next_step::ns_break) break;
-            if(c == next_step::ns_continue) continue;
+            try
+            {
+                next_step c = body->run();
+            }
+            catch(next_step& c)
+            {
+                if(c == next_step::ns_break) break;
+                if(c == next_step::ns_continue) continue;
+            }
         }
         while( condition->run() );
     }
@@ -301,8 +350,6 @@ public:
             try
             {
                 next_step c = body->run();
-                if(c == next_step::ns_break) break;
-                if(c == next_step::ns_continue) continue;
             }
             catch(next_step& c)
             {
@@ -340,8 +387,6 @@ public:
             try
             {
                 next_step c = body->run();
-                if(c == next_step::ns_break) break;
-                if(c == next_step::ns_continue) continue;
             }
             catch(next_step& c)
             {
@@ -578,17 +623,30 @@ private:
 };
 
 template <class T>
+class extra_xor <T const>: public basic_extra
+{
+public:
+    extra_xor(const T& a) {}
+};
+
+
+template <class T>
 class extra_addition : public basic_extra
 {
 public:
     extra_addition(T& a) : v(a) { v += 1; }
     virtual ~extra_addition() { v -= 1; }
 
-
 private:
     T& v;
 };
 
+template <class T>
+class extra_addition <T const>: public basic_extra
+{
+public:
+    extra_addition(const T& a) {}
+};
 
 template <class T>
 class extra_substraction : public basic_extra
@@ -599,6 +657,13 @@ public:
 
 private:
     T& v;
+};
+
+template <class T>
+class extra_substraction <T const> : public basic_extra
+{
+public:
+    extra_substraction(const T& a) {}
 };
 
 
@@ -632,6 +697,18 @@ template <> struct Num<int,1>
 {
     enum {value = 1};
     int v = value;
+};
+
+template <> struct Num<char,0>
+{
+    enum {value = 0};
+    char v = value;
+};
+
+template <> struct Num<char,1>
+{
+    enum {value = 1};
+    char v = value;
 };
 
 #if defined _DEBUG || defined DEBUG || defined OBF_DEBUG
@@ -677,7 +754,7 @@ template <> struct Num<int,1>
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
-#define V(a) ([&](){obf::extra_chooser<decltype(a), obf::MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
+#define V(a) ([&](){obf::extra_chooser<std::remove_reference<decltype(a)>::type, obf::MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
             return obf::stream_helper();}() << a)
 
 #define FOR(init,cond,inc) { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::for_wrapper( [&](){(init); return __crv; },\
@@ -700,7 +777,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define RETURN(x) __rvlocal.reset(new obf::rvholder<decltype(x)>(x,x));  throw __rvlocal;
 
 #define REPEAT { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::repeat_wrapper().set_body( [&]() {
-#define UNTIL(x) return __crv;}).set_condition([&]()->bool{ return (x); }).run(); }
+#define UNTIL(x) return __crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
 
 #define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
