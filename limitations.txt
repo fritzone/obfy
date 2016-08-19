@@ -1,2 +1,0 @@
-1. return from inside a loop (while, for, repeat) not possible
-2. binaryo operators for value holders not possible

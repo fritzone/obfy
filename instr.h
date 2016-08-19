@@ -22,6 +22,12 @@
 #ifndef INSTR_H
 #define INSTR_H
 
+
+
+#include <iostream>
+#include <string>
+#include <typeinfo>
+
 #include <memory>
 #include <random>
 #include <vector>
@@ -35,9 +41,16 @@
 namespace obf
 {
 
-// random generator reusing from https://github.com/andrivet/ADVobfuscator
-// Copyright (c) 2010-2014, Sebastien Andrivet
-// All rights reserved.
+// Compile time random number generator from https://github.com/andrivet/ADVobfuscator
+/*
+ * Written by Sebastien Andrivet
+ * Copyright (c) 2010-2015 - Sebastien Andrivet All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+ * 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 constexpr char time[] = __TIME__;
 constexpr int DigitToInt(char c) { return c - '0'; }
 const int seed = DigitToInt(time[7]) +
@@ -185,6 +198,7 @@ DEFINE_BINARY_OPERATOR(&)
 DEFINE_BINARY_OPERATOR(|)
 DEFINE_BINARY_OPERATOR(<<)
 DEFINE_BINARY_OPERATOR(>>)
+DEFINE_BINARY_OPERATOR(^)
 
 
 /* Helping stuff */
@@ -488,30 +502,31 @@ private:
     std::unique_ptr<next_step_functor_base> instructions;
 };
 
-template<class CT>
-class case_wrapper final
+template <class CT>
+class case_wrapper_base
 {
 public:
-    explicit case_wrapper(const CT& v) : check(v), default_step(nullptr) {}
+    explicit case_wrapper_base(const CT& v) : check(v), default_step(nullptr) {}
 
-    case_wrapper& add_entry(const case_instruction& lambda_holder)
+
+    case_wrapper_base& add_entry(const case_instruction& lambda_holder)
     {
         steps.push_back(&lambda_holder);
         return *this;
     }
 
-    case_wrapper& add_default(const case_instruction& lambda_holder)
+    case_wrapper_base& add_default(const case_instruction& lambda_holder)
     {
         default_step = &lambda_holder;
         return *this;
     }
 
-    case_wrapper& join()
+    case_wrapper_base& join()
     {
         return *this;
     }
 
-    void run()
+    void run() const
     {
         auto it = steps.begin();
         bool at_least_one_execeuted = false;
@@ -519,7 +534,7 @@ public:
         {
             bool increased = false;
             // see if  this is a branch or body
-            if(dynamic_cast<const branch<CT>*>(*it))
+            if(dynamic_cast<const branch<CT>*>(*it) || dynamic_cast<const branch<const CT>*>(*it))
             {
                 // branch. Execute it, see if it returns true or false
                 next_step enter = (*it)->execute(rvholder<CT>(check,check));
@@ -558,7 +573,9 @@ public:
             }
             else
             {
-                // shouldn't really get in here
+                auto x = typeid(*it).name();
+                std::cout  << x ;
+                throw(it);
             }
 
 
@@ -576,9 +593,25 @@ public:
     }
 
 private:
+
     std::vector<const case_instruction*> steps;
-    CT check;
+    const CT check;
     const case_instruction* default_step;
+};
+
+template<class CT>
+class case_wrapper final : public case_wrapper_base<CT>
+{
+public:
+    explicit case_wrapper(const CT& v) : case_wrapper_base<CT>(v) {}
+};
+
+
+template<class CT>
+class case_wrapper <const CT> final : public case_wrapper_base<CT>
+{
+public:
+    explicit case_wrapper(const CT& v) : case_wrapper_base<CT>(v) {}
 };
 
 /* syntactic sugar */
@@ -609,7 +642,7 @@ public:
 };
 
 template <class T>
-class extra_xor : public basic_extra
+class extra_xor final : public basic_extra
 {
 public:
     extra_xor(T& a) : v(a)
@@ -623,7 +656,7 @@ private:
 };
 
 template <class T>
-class extra_xor <T const>: public basic_extra
+class extra_xor <const T> final: public basic_extra
 {
 public:
     extra_xor(const T& a) {}
@@ -631,7 +664,7 @@ public:
 
 
 template <class T>
-class extra_addition : public basic_extra
+class extra_addition final : public basic_extra
 {
 public:
     extra_addition(T& a) : v(a) { v += 1; }
@@ -642,14 +675,14 @@ private:
 };
 
 template <class T>
-class extra_addition <T const>: public basic_extra
+class extra_addition <const T> final: public basic_extra
 {
 public:
     extra_addition(const T& a) {}
 };
 
 template <class T>
-class extra_substraction : public basic_extra
+class extra_substraction final : public basic_extra
 {
 public:
     extra_substraction(T& a) : v(a) {v -= 1; }
@@ -660,12 +693,11 @@ private:
 };
 
 template <class T>
-class extra_substraction <T const> : public basic_extra
+class extra_substraction <const T> final : public basic_extra
 {
 public:
     extra_substraction(const T& a) {}
 };
-
 
 template <typename T, int N>
 class extra_chooser
@@ -673,43 +705,47 @@ class extra_chooser
     using type=basic_extra; // intentionally private
 };
 
-/* Number obfuscation implementer */
+/* Constant obfuscation implementer */
 
-template<typename T, T n>
-struct Num
+template<typename T, T n> class Num final
 {
+public:
     enum { value = ( (n & 0x01)  | ( Num < T , (n >> 1)>::value << 1) ) };
-    T v;
     Num() : v(0)
     {
         v = value ^  MetaRandom<32, 4096>::value;
     }
-    T get() const { return v ^ MetaRandom<32, 4096>::value;}
+    T get() const { return v ^ MetaRandom<32, 4096>::value; }
+private:
+    T v;
 };
 
-template <> struct Num<int,0>
-{
-    enum {value = 0};
-    int v = value;
-};
+struct Zero { enum {value = 0}; };
+struct One { enum {value = 1}; };
+#define ZERO(t) template <> struct Num<t,0> final : public Zero { t v = value; };
+#define ONE(t) template <> struct Num<t,1> final : public One { t v = value; };
+#define TYPE(t) ZERO(t) ONE(t)
 
-template <> struct Num<int,1>
-{
-    enum {value = 1};
-    int v = value;
-};
+TYPE(bool)
 
-template <> struct Num<char,0>
-{
-    enum {value = 0};
-    char v = value;
-};
+TYPE(char)
+TYPE(signed char)
+TYPE(unsigned char)
+TYPE(char16_t)
+TYPE(char32_t)
+TYPE(wchar_t)
 
-template <> struct Num<char,1>
-{
-    enum {value = 1};
-    char v = value;
-};
+TYPE(short int)
+TYPE(unsigned short int)
+
+TYPE(int)
+TYPE(unsigned int)
+
+TYPE(long int)
+TYPE(unsigned long int)
+
+TYPE(long long int)
+TYPE(unsigned long long int)
 
 #if defined _DEBUG || defined DEBUG || defined OBF_DEBUG
 
@@ -754,7 +790,8 @@ template <> struct Num<char,1>
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
-#define V(a) ([&](){obf::extra_chooser<std::remove_reference<decltype(a)>::type, obf::MetaRandom<__COUNTER__, MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
+#define V(a) ([&](){obf::extra_chooser<std::remove_reference<decltype(a)>::type, obf::MetaRandom<__COUNTER__, \
+            MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
             return obf::stream_helper();}() << a)
 
 #define FOR(init,cond,inc) { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::for_wrapper( [&](){(init); return __crv; },\
@@ -774,7 +811,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define BREAK __crv = obf::next_step::ns_break; throw __crv;
 #define CONTINUE __crv = obf::next_step::ns_continue; throw __crv;
 
-#define RETURN(x) __rvlocal.reset(new obf::rvholder<decltype(x)>(x,x));  throw __rvlocal;
+#define RETURN(x) __rvlocal.reset(new obf::rvholder<std::remove_reference<decltype(x)>::type>(x,x));  throw __rvlocal;
 
 #define REPEAT { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::repeat_wrapper().set_body( [&]() {
 #define UNTIL(x) return __crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
@@ -782,9 +819,10 @@ DEFINE_EXTRA(2, extra_addition);
 #define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
 
-#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; auto __avholder = a; obf::case_wrapper<decltype(a)>(a).
+#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
 #define ENDCASE run(); } catch(obf::next_step& cv) {}
-#define WHEN(c) add_entry(obf::branch<decltype(__avholder)>( [&]() -> decltype(__avholder) { decltype(__avholder) __c = (c); return __c;} )).
+#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>( [&]() -> std::remove_reference<decltype(__avholder)>::type\
+                { std::remove_reference<decltype(__avholder)>::type __c = (c); return __c;} )).
 #define DO add_entry( obf::body([&](){
 #define DONE return obf::next_step::ns_continue;})).
 #define OR join().

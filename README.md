@@ -142,7 +142,7 @@ For a more under the hood view of the framework, the `OBF_BEGIN` and `OBF_END` m
 
 #### Value and numerical wrappers
 
-To achieve an extra layer of obfuscation, the numerical values can be wrapped in the macro `N()` and all numeric variables (`int`, `long`, ...) can be wrapped in the macro `V()` to provide an extra layer of obfuscation for doing the calculation operations. The `V()` value wrapper also can wrap individual array elements(`x[2]`), but not arrays (`x`) and also cannot wrap class instantiation values due to the fact that the macro expands to a reference holder object.
+To achieve an extra layer of obfuscation, the integral numerical values can be wrapped in the macro `N()` and all integral numeric variables (`int`, `long`, ...) can be wrapped in the macro `V()` to provide an extra layer of obfuscation for doing the calculation operations. The `V()` value wrapper also can wrap individual array elements(`x[2]`), but not arrays (`x`) and also cannot wrap class instantiation values due to the fact that the macro expands to a reference holder object.
 
 The implementation of the wrappers uses the link time random number generator provided by [Andrivet] and the values are obfuscated by performing various operations to hide the original value.
 
@@ -460,6 +460,8 @@ Now, that we are aware of a library that offers code obfuscation without too muc
 Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. This is intentionally like this, because of the need to have familiar words that a developer instantly can connect to, and also to subscribe to the C++ rule, that macros should be uppercase.
 
 This brings us back to the swampy area of C++ and macros. There are several voices whispering loudly that macros have nothing to do in a C++ code, and there are several voices echoing back that macros if wisely used can help C++ code as well as good old style C. I personally have nothing against the wise use of macros, indeed they came to be very helpful while developing this framework.
+
+And last, but not least, the numeric value wrappers do not work with floating point numbers. This is due to the fact that extensive binary operations are used on the number to obfuscate its value and this would be impossible to accomplish with floating point values.
 
 # References
 
