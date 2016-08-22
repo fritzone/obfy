@@ -281,6 +281,21 @@ int returner()
     OBF_END
 }
 
+struct ATest
+{
+    int x = 42;
+};
+
+ATest class_test(int& a)
+{
+    OBF_BEGIN
+        IF(V(a) == 42)
+            V(a) = 43;
+        ENDIF
+        RETURN (ATest()) ;
+    OBF_END
+}
+
 BOOST_AUTO_TEST_CASE(test_wrappers)
 {
     BOOST_CHECK_EQUAL(numeric_wrapper_returner(), 42);
@@ -318,4 +333,8 @@ BOOST_AUTO_TEST_CASE(case_test)
 BOOST_AUTO_TEST_CASE(return_test)
 {
     BOOST_CHECK_EQUAL(returner(), 42);
+    int a = 5;
+    ATest x = class_test(a);
+    BOOST_CHECK_EQUAL(a, 42);
+    BOOST_CHECK_EQUAL(x.x, 42);
 }
