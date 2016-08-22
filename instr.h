@@ -22,9 +22,6 @@
 #ifndef INSTR_H
 #define INSTR_H
 
-
-
-#include <iostream>
 #include <string>
 #include <typeinfo>
 
@@ -559,12 +556,8 @@ public:
                     {
                         if(dynamic_cast<const body*>(*it))
                         {
-                            next_step leave_switch = (*it)->execute(rvholder<CT>(check,check));
+                            (*it)->execute(rvholder<CT>(check,check));
                             at_least_one_execeuted = true;
-                            if(leave_switch == next_step::ns_break)
-                            {
-                                return;
-                            }
                         }
                         increased = true;
                         ++it;
@@ -573,9 +566,7 @@ public:
             }
             else
             {
-                auto x = typeid(*it).name();
-                std::cout  << x ;
-                throw(it);
+                throw(std::string("invalid type:") + typeid(*it).name());
             }
 
 
@@ -659,7 +650,7 @@ template <class T>
 class extra_xor <const T> final: public basic_extra
 {
 public:
-    extra_xor(const T& a) {}
+    extra_xor(const T&) = default;
 };
 
 
@@ -678,7 +669,7 @@ template <class T>
 class extra_addition <const T> final: public basic_extra
 {
 public:
-    extra_addition(const T& a) {}
+    extra_addition(const T&) = default;
 };
 
 template <class T>
@@ -696,7 +687,7 @@ template <class T>
 class extra_substraction <const T> final : public basic_extra
 {
 public:
-    extra_substraction(const T& a) {}
+    extra_substraction(const T&) = default;
 };
 
 template <typename T, int N>

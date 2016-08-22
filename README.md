@@ -455,6 +455,48 @@ In case the framework is used in debugging mode the macros expand to the followi
 
 Now, that we are aware of a library that offers code obfuscation without too much headaches from our side (at least, this was the intention of the author) let's re-consider the implementation of the naive licensing algorithm using these new terms. So here it comes:
 
+```cpp
+bool check_license1(const char* user, const char* users_license)
+{
+    OBF_BEGIN
+    std::string license;
+    size_t ll = strlen(users_license);
+    size_t l = strlen(user), lic_ctr = N(0);
+
+    size_t add = N(0), i =N(0);
+
+    FOR (V(i) = N(0), V(i) < V(ll), V(i)++)
+        IF ( V(users_license[i]) != N(45) )
+            license += users_license[i];
+        ENDIF
+    ENDFOR
+
+    WHILE (V(lic_ctr) < license.length() )
+
+        size_t i = lic_ctr;
+        V(i) %= l;
+        int current = 0;
+        WHILE(V(i) < V(l) )
+            V(current) += user[V(i)++];
+        ENDWHILE
+        V(current) += V(add);
+        ++V(add);
+
+        IF ( (license [lic_ctr] != letters[current % sizeof letters]) )
+            RETURN(false);
+        ENDIF
+
+        lic_ctr++;
+    ENDWHILE
+
+    RETURN (true);
+
+    OBF_END
+}
+```
+
+Indeed, it looks a little bit more "obfuscated" than the original source, but after compilation it adds a great layer of extra code around the standard logic, and the generated binary is much more cumbersome to understand than the one "before" the obfuscation. And due to the sheer size of the generated code, we simply omit publishing it here.
+
 # Discommodities of the framework
 
 Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. This is intentionally like this, because of the need to have familiar words that a developer instantly can connect to, and also to subscribe to the C++ rule, that macros should be uppercase.
@@ -463,10 +505,13 @@ This brings us back to the swampy area of C++ and macros. There are several voic
 
 And last, but not least, the numeric value wrappers do not work with floating point numbers. This is due to the fact that extensive binary operations are used on the number to obfuscate its value and this would be impossible to accomplish with floating point values.
 
+# License and getting the framework
+
+The library is a header only library, released in the public domain under the MIT license.
+
+You can get it from https://github.com/fritzone/obfy 
+
 # References
 
 [Andrivet] - Random Generator by Sebastien Andrivet - https://github.com/andrivet/ADVobfuscator
 
-# license
-
-The library is a header only library, released in the public domain under the MIT license.
