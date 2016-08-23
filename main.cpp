@@ -289,8 +289,8 @@ struct ATest
 ATest class_test(int& a)
 {
     OBF_BEGIN
-        IF(V(a) == 42)
-            V(a) = 43;
+        IF(V(a) == 5)
+            V(a) = 42;
         ENDIF
         RETURN (ATest()) ;
     OBF_END
