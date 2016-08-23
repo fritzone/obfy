@@ -385,13 +385,28 @@ As expected, the `RETURN` statement returns the execution of the current functio
 ```cpp
 int some_fun()
 {
-OBF_BEGIN
-    RETURN(42)
-OBF_END
+    OBF_BEGIN
+
+        RETURN(42)
+
+    OBF_END
 }
 ```
 
-With the introduction of `RETURN`, an important issue arose: The obfuscation framework does not support the usage of `void` functions
+With the introduction of `RETURN`, an important issue arose: The obfuscation framework does not support the usage of `void` functions. So the following code will not compile:
+
+```cpp
+void void_test(int& a)
+{
+    OBF_BEGIN
+        IF(V(a) == 42)
+            V(a) = 43;
+        ENDIF
+    OBF_END
+}
+```
+
+This is a seemingly annoying feature, but it easily can be fixed by simply changing the return type of the function to any non-void type. The reason is that the `RETURN` macro and the underlying C++ constructs should handle a wide variety of returnable types in a manner which can be handled easily by the programmer without causing confusion.
 
 ##### The `CASE` statement
 
@@ -504,6 +519,12 @@ Those who dislike the usage of CAPITAL letters in code may find the framework to
 This brings us back to the swampy area of C++ and macros. There are several voices whispering loudly that macros have nothing to do in a C++ code, and there are several voices echoing back that macros if wisely used can help C++ code as well as good old style C. I personally have nothing against the wise use of macros, indeed they came to be very helpful while developing this framework.
 
 And last, but not least, the numeric value wrappers do not work with floating point numbers. This is due to the fact that extensive binary operations are used on the number to obfuscate its value and this would be impossible to accomplish with floating point values.
+
+# Some requirements
+
+The code is written with "older" compilers in mind, so not all the latest and greatest features of C++14 and 17 are being included, only supported by the latest iteration of these compilers. CLang version 3.4.1 happily compiles the source code, so does g++ 4.8.2. Visual Studio 2015, Update 3 is also compiling the code.
+
+Unit testing is done using the Boost Unit test framework. The build system for the unit tests is CMake.
 
 # License and getting the framework
 
