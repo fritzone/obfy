@@ -281,7 +281,7 @@ private:
 
 struct any_functor_base
 {
-    virtual void run(void*) = 0;
+    virtual void run(void*) const = 0;
 };
 
 template <class T>
@@ -289,7 +289,7 @@ struct any_functor final : public any_functor_base
 {
     any_functor(T r) : runner(r) {}
 
-    virtual void run(void* retv)
+    virtual void run(void* retv) const override
     {
         auto r = runner();
         *reinterpret_cast<decltype(r)*>(retv) = r;
@@ -474,7 +474,7 @@ public:
     virtual next_step execute(const base_rvholder& against) const override
     {
         CT retv;
-        condition->run( reinterpret_cast<void*>(&retv) );
+        condition->run( const_cast<void*>(reinterpret_cast<const void*>(&retv) ) );
         // this looks funny, however we cannot use the operator ==
         // due to a visual C++ 2015 compiler bug, which fails to compile and crashes
         return equals(against,retv) ? next_step::ns_done : next_step::ns_continue;
@@ -650,7 +650,7 @@ template <class T>
 class extra_xor <const T> final: public basic_extra
 {
 public:
-    extra_xor(const T&) = default;
+    extra_xor(const T&) {}
 };
 
 
@@ -669,7 +669,7 @@ template <class T>
 class extra_addition <const T> final: public basic_extra
 {
 public:
-    extra_addition(const T&) = default;
+    extra_addition(const T&) {}
 };
 
 template <class T>
@@ -687,7 +687,7 @@ template <class T>
 class extra_substraction <const T> final : public basic_extra
 {
 public:
-    extra_substraction(const T&) = default;
+    extra_substraction(const T&) {}
 };
 
 template <typename T, int N>
@@ -812,7 +812,7 @@ DEFINE_EXTRA(2, extra_addition);
 
 #define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
 #define ENDCASE run(); } catch(obf::next_step& cv) {}
-#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>( [&]() -> std::remove_reference<decltype(__avholder)>::type\
+#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>( [&,__avholder]() -> std::remove_reference<decltype(__avholder)>::type\
                 { std::remove_reference<decltype(__avholder)>::type __c = (c); return __c;} )).
 #define DO add_entry( obf::body([&](){
 #define DONE return obf::next_step::ns_continue;})).
