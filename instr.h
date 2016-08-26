@@ -706,37 +706,37 @@ public:
     {
         v = value ^  MetaRandom<32, 4096>::value;
     }
-    T get() const { return v ^ MetaRandom<32, 4096>::value; }
+    T get() const { volatile T x = v ^ MetaRandom<32, 4096>::value; return x;}
 private:
-    T v;
+    volatile T v;
 };
 
-struct Zero { enum {value = 0}; };
-struct One { enum {value = 1}; };
-#define ZERO(t) template <> struct Num<t,0> final : public Zero { t v = value; };
-#define ONE(t) template <> struct Num<t,1> final : public One { t v = value; };
-#define TYPE(t) ZERO(t) ONE(t)
+struct ObfZero { enum {value = 0}; };
+struct ObfOne { enum {value = 1}; };
+#define OBF_ZERO(t) template <> struct Num<t,0> final : public ObfZero { t v = value; };
+#define OBF_ONE(t) template <> struct Num<t,1> final : public ObfOne { t v = value; };
+#define OBF_TYPE(t) OBF_ZERO(t) OBF_ONE(t)
 
-TYPE(bool)
+OBF_TYPE(bool)
 
-TYPE(char)
-TYPE(signed char)
-TYPE(unsigned char)
-TYPE(char16_t)
-TYPE(char32_t)
-TYPE(wchar_t)
+OBF_TYPE(char)
+OBF_TYPE(signed char)
+OBF_TYPE(unsigned char)
+OBF_TYPE(char16_t)
+OBF_TYPE(char32_t)
+OBF_TYPE(wchar_t)
 
-TYPE(short int)
-TYPE(unsigned short int)
+OBF_TYPE(short int)
+OBF_TYPE(unsigned short int)
 
-TYPE(int)
-TYPE(unsigned int)
+OBF_TYPE(int)
+OBF_TYPE(unsigned int)
 
-TYPE(long int)
-TYPE(unsigned long int)
+OBF_TYPE(long int)
+OBF_TYPE(unsigned long int)
 
-TYPE(long long int)
-TYPE(unsigned long long int)
+OBF_TYPE(long long int)
+OBF_TYPE(unsigned long long int)
 
 #if defined _DEBUG || defined DEBUG || defined OBF_DEBUG
 

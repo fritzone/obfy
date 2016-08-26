@@ -179,7 +179,36 @@ And the following
     }
 ```
 
-will be undefined behaviour since the compiler highly probably will allocate the string `"ABC"` in a constant memory area. To work with this kind of data always use `char[]` instead of `char*`.
+will be undefined behaviour because the compiler highly probably will allocate the string `"ABC"` in a constant memory area (although I would expect your compiler to choke heavily on this expression since it's not valid modern C++ anymore). To work with this kind of data always use `char[]` instead of `char*`.
+
+##### Behind the scenes of the implementation of the numeric wrapping
+
+The `N` macro is defined like the following:
+
+```cpp
+#define N(a) (obf::Num<decltype(a), obf::MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ obf::MetaRandom<__COUNTER__ - 1, 4096>::value)
+```
+
+As a first step let's consider that due to the implementation of [Andrivet] and the (more or less standard) `__COUNTER__` macro the `obf::MetaRandom<__COUNTER__, 4096>::value` and `obf::MetaRandom<__COUNTER__ - 1, 4096>::value)` will have the same value.
+
+Now, taking the `obf::Num` class in the visor:
+
+```cpp
+template<typename T, T n> class Num final
+{
+public:
+    enum { value = ( (n & 0x01)  | ( Num < T , (n >> 1)>::value << 1) ) };
+    Num() : v(0)
+    {
+        v = value ^  MetaRandom<32, 4096>::value;
+    }
+    T get() const { volatile T x = v ^ MetaRandom<32, 4096>::value; return x;}
+private:
+    volatile T v;
+};
+```
+
+The `Num` class tries to add some protection by adding some extra xor operations to the usage of a simple number, thus turning a simple numeric assignment into several steps of assembly code.
 
 ### Control structures of the framework
 
@@ -514,7 +543,7 @@ Indeed, it looks a little bit more "obfuscated" than the original source, but af
 
 # Discommodities of the framework
 
-Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. This is intentionally like this, because of the need to have familiar words that a developer instantly can connect to, and also to subscribe to the C++ rule, that macros should be uppercase.
+Those who dislike the usage of CAPITAL letters in code may find the framework to be annoying. As presented in [Wakely] this almost feels like the code is shouting at you. However, for this particular use case I intentionally made it like this, because of the need to have familiar words that a developer instantly can connect to (because the lower case words are already keywords), and also to subscribe to the C++ rule, that macros should be uppercase. 
 
 This brings us back to the swampy area of C++ and macros. There are several voices whispering loudly that macros have nothing to do in a C++ code, and there are several voices echoing back that macros if wisely used can help C++ code as well as good old style C. I personally have nothing against the wise use of macros, indeed they came to be very helpful while developing this framework.
 
@@ -522,9 +551,9 @@ And last, but not least, the numeric value wrappers do not work with floating po
 
 # Some requirements
 
-The code is written with "older" compilers in mind, so not all the latest and greatest features of C++14 and 17 are being included, only supported by the latest iteration of these compilers. CLang version 3.4.1 happily compiles the source code, so does g++ 4.8.2. Visual Studio 2015, Update 3 is also compiling the code.
+The code is written also with "older" compilers in mind, so not all the latest and greatest features of C++14 and 17 are being included. CLang version 3.4.1 happily compiles the source code, so does g++ 4.8.2. Visual Studio 2015, Update 3 is also compiling the code.
 
-Unit testing is done using the Boost Unit test framework. The build system for the unit tests is CMake.
+Unit testing is done using the Boost Unit test framework. The build system for the unit tests is CMake and there is support for code coverage (the last two were tested only under linux).
 
 # License and getting the framework
 
@@ -536,3 +565,4 @@ You can get it from https://github.com/fritzone/obfy
 
 [Andrivet] - Random Generator by Sebastien Andrivet - https://github.com/andrivet/ADVobfuscator
 
+[Wakely] - Stop the Constant Shouting- Overload Journal #121 - June 2014, Jonathan Wakely

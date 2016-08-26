@@ -4,7 +4,7 @@
 #endif
 
 #include <boost/test/auto_unit_test.hpp>
-
+// #define OBF_DEBUG
 #include "instr.h"
 
 int numeric_wrapper_returner()
@@ -64,6 +64,8 @@ int for_loop_test()
 {
     int a;
     int n = 0;
+    int x;
+    V(x) = N(556);
     OBF_BEGIN
 
         FOR(V(a) = 0, V(a) < N(10), V(a)++)
@@ -220,7 +222,11 @@ int repeat_loop_test_continue()
 int case_tester()
 {
     const std::string something = "B";
-    int n = 0;
+    int n =
+
+
+#ifndef OBF_DEBUG
+            0;
 
     OBF_BEGIN
 
@@ -243,14 +249,19 @@ int case_tester()
         ENDCASE
 
     OBF_END
-
+#else
+            42;
+        #endif
     return n;
 }
 
 int case_tester_fallthrough()
 {
     std::string something = "B";
-    int n = 0;
+    int n =
+
+#ifndef OBF_DEBUG
+            0;
     OBF_BEGIN
 
         CASE (something)
@@ -270,6 +281,9 @@ int case_tester_fallthrough()
         ENDCASE
 
     OBF_END
+#else
+    44;
+#endif
 
     return n;
 }
