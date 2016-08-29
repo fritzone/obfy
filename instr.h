@@ -99,7 +99,7 @@ struct MetaRandom
     bool operator x (const T& ov) { return (v x ov); }
 
 
-/* simple reference holder class, mostly for dealing with numbers */
+/* simple reference holder class, mostly for dealing with holding variables */
 template <typename T>
 class refholder final
 {
@@ -150,7 +150,7 @@ public:
 private:
 
     /* The root of all evil */
-    T& v;
+    volatile T& v;
 };
 
 
@@ -638,12 +638,17 @@ class extra_xor final : public basic_extra
 public:
     extra_xor(T& a) : v(a)
     {
-        v ^= MetaRandom<16, 4096>::value;
+		volatile T lv = MetaRandom<__COUNTER__, 4096>::value;
+        v ^= lv;
     }
-    virtual ~extra_xor() { v ^= MetaRandom<16, 4096>::value; }
+    virtual ~extra_xor() 
+	{
+		volatile T lv = MetaRandom<__COUNTER__ - 1, 4096>::value;
+		v ^= lv; 
+	}
 
 private:
-    T& v;
+    volatile T& v;
 };
 
 template <class T>
@@ -653,16 +658,22 @@ public:
     extra_xor(const T&) {}
 };
 
-
 template <class T>
 class extra_addition final : public basic_extra
 {
 public:
-    extra_addition(T& a) : v(a) { v += 1; }
-    virtual ~extra_addition() { v -= 1; }
-
+    extra_addition(T& a) : v(a) 
+	{ 
+		volatile T lv = MetaRandom<__COUNTER__, 4096>::value;
+		v += lv; 
+	}
+    virtual ~extra_addition() 
+	{
+		volatile T lv = MetaRandom<__COUNTER__ - 1, 4096>::value;
+		v -= lv; 
+	}
 private:
-    T& v;
+    volatile T& v;
 };
 
 template <class T>
@@ -676,11 +687,11 @@ template <class T>
 class extra_substraction final : public basic_extra
 {
 public:
-    extra_substraction(T& a) : v(a) {v -= 1; }
-    virtual ~extra_substraction() { v += 1; }
+    extra_substraction(T& a) : v(a) {v -= MetaRandom<__COUNTER__, 4096>::value; }
+    virtual ~extra_substraction() { v += MetaRandom<__COUNTER__ - 1, 4096>::value; }
 
 private:
-    T& v;
+    volatile T& v;
 };
 
 template <class T>
@@ -706,7 +717,7 @@ public:
     {
         v = value ^  MetaRandom<32, 4096>::value;
     }
-    T get() const { volatile T x = v ^ MetaRandom<32, 4096>::value; return x;}
+    T get() const { T x = v ^ MetaRandom<32, 4096>::value; return x;}
 private:
     volatile T v;
 };
@@ -738,7 +749,7 @@ OBF_TYPE(unsigned long int)
 OBF_TYPE(long long int)
 OBF_TYPE(unsigned long long int)
 
-#if defined _DEBUG || defined DEBUG || defined OBF_DEBUG
+#if defined OBF_DEBUG
 
 #define OBF_BEGIN
 #define OBF_END

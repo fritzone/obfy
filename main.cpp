@@ -1,10 +1,9 @@
-#define BOOST_TEST_MAIN
 #if !defined( WIN32 )
+	#define BOOST_TEST_MAIN
     #define BOOST_TEST_DYN_LINK
+	#include <boost/test/auto_unit_test.hpp>
 #endif
 
-#include <boost/test/auto_unit_test.hpp>
-// #define OBF_DEBUG
 #include "instr.h"
 
 int numeric_wrapper_returner()
@@ -15,6 +14,16 @@ int numeric_wrapper_returner()
     OBF_END
     return n;
 }
+
+int simple_variable_wrapper_returner()
+{
+	int n;
+	OBF_BEGIN
+		V(n) = N(42);
+	OBF_END
+	return n;
+}
+
 
 int variable_wrapper_returner()
 {
@@ -310,6 +319,8 @@ ATest class_test(int& a)
     OBF_END
 }
 
+#if !defined (WIN32)
+
 BOOST_AUTO_TEST_CASE(test_wrappers)
 {
     BOOST_CHECK_EQUAL(numeric_wrapper_returner(), 42);
@@ -352,3 +363,12 @@ BOOST_AUTO_TEST_CASE(return_test)
     BOOST_CHECK_EQUAL(a, 42);
     BOOST_CHECK_EQUAL(x.x, 42);
 }
+
+#else
+#include <iostream>
+int main()
+{
+	std::cout << numeric_wrapper_returner() << std::endl << simple_variable_wrapper_returner();
+}
+
+#endif

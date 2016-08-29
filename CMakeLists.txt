@@ -9,6 +9,8 @@ else()
     add_definitions("/EHsc")
 endif()
 
+add_executable(obfy_test main.cpp ${SOURCE_FILES})
+
 if(unit_tests)
 
     find_package(Boost COMPONENTS system filesystem unit_test_framework REQUIRED)
@@ -18,7 +20,6 @@ if(unit_tests)
         include_directories(${Boost_INCLUDE_DIRS})
     endif() 
 
-    add_executable(obfy_test main.cpp ${SOURCE_FILES})
     enable_testing()
 
     target_link_libraries(obfy_test
