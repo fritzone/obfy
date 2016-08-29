@@ -140,6 +140,22 @@ then using the macro pair `OBF_BEGIN` and `OBF_END` as delimiters of the code se
 
 For a more under the hood view of the framework, the `OBF_BEGIN` and `OBF_END` macros declare a `try`-`catch` block, which has support for returning values from the obfuscated current code sequence, and also provides support for basic control flow modifications such as the usage of `continue` and `break` emulator macros `CONTINUE` and `BREAK`.
 
+#### Behind the scenes: `OBF_BEGIN` and `OBF_END`
+
+`OBF_BEGIN` expands to:
+
+```
+#define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
+```
+
+and `OBF_END` becomes:
+
+```
+#define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
+```
+
+In order to support for "return"-ing a value from the current obfuscated block we need a special variable `__rvlocal`. At later stages this value will be populated with meaningful values as a result of executing the code of the `RETURN` macro (which will "throw" a value with type of `std::shared_ptr<obf::base_rvholder>`). The `OBF_END` will catch this specific value and handle it appropriately, while all other values thrown will be re-thrown in order to not to disturb the client code's exception handling.
+
 #### Value and numerical wrappers
 
 To achieve an extra layer of obfuscation, the integral numerical values can be wrapped in the macro `N()` and all integral numeric variables (`int`, `long`, ...) can be wrapped in the macro `V()` to provide an extra layer of obfuscation for doing the calculation operations. The `V()` value wrapper also can wrap individual array elements(`x[2]`), but not arrays (`x`) and also cannot wrap class instantiation values due to the fact that the macro expands to a reference holder object.
@@ -242,6 +258,8 @@ However, please note the several `volatile` variables ... which are required in 
 In case of not building the code in debugging mode, the macro `V` expands to the following C++ nightmare:
 
 ```cpp
+#define MAX_BOGUS_IMPLEMENTATIONS 3
+
 #define V(a) ([&]() {obf::extra_chooser<std::remove_reference<decltype(a)>::type, obf::MetaRandom<__COUNTER__, \
             MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
             return obf::stream_helper();}() << a)
@@ -249,7 +267,7 @@ In case of not building the code in debugging mode, the macro `V` expands to the
 
 So let's dissect it in order to understand the underlying operations.
 
-The value wrappers add an extra obfuscation layer to the values they wrap by performing an extra addition, an extra substraction or an extra xor operation on the value itself. This is picked randomly when compilation happens by the `extra_chooser` class, which is like:
+The value wrappers add an extra obfuscation layer to the values they wrap, by performing an extra addition, an extra substraction or an extra xor operation on the value itself. This is picked randomly when compilation happens by the `extra_chooser` class, which is like:
 
 ```cpp
 template <typename T, int N>
@@ -262,9 +280,8 @@ class extra_chooser
 And is helped by the following constructs:
 
 ```cpp
-#define MAX_BOGUS_IMPLEMENTATIONS 3
-
 #define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
+
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
@@ -293,7 +310,7 @@ private:
 ```
 Where the extra addition and substraction are also very similar.
 
-The next thing we observe is that an object of this kind (ie. etra bogus operation chooser) is defined in a lambda function for the variable we are wrapping. The variable name for this is determined by `_JOIN(_ec_,__COUNTER__)(a)`, where `_JOIN` is just a simple joiner macro:
+The next thing we observe is that an object of this kind (ie. extra bogus operation chooser) is defined in a lambda function for the variable we are wrapping. The variable name for this is determined by `_JOIN(_ec_,__COUNTER__)(a)`, where `_JOIN` is just a simple joiner macro:
 
 ```cpp
 #define _JOIN(a,b) a##b
@@ -446,6 +463,120 @@ In case the debugging mode is active, the `IF`-`ELSE`-`ENDIF` macros are defined
 
 The `IF` macro expands to the following:
 
+```
+#define IF(x) {std::shared_ptr<obf::base_rvholder> __rvlocal; obf::if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
+```
+
+the `ELSE` macro exopands to:
+
+```
+#define ELSE return __crv;}).set_else( [&]() {
+```
+
+and the `ENDIF` will give:
+
+```
+#define ENDIF return __crv;}).run(); }
+```
+
+so to wrap up all, the following code:
+
+```cpp
+IF( n == 42)
+    n = 43;
+ELSE
+    n = 44;
+ENDIF
+```
+
+will expand to
+
+```cpp
+{
+    std::shared_ptr<obf::base_rvholder> __rvlocal; 
+    obf::if_wrapper( ([&]()->bool
+    { 
+        return (n == 42); 
+    }) )
+    .set_then( [&]() 
+    {
+        n = 43;
+        return __crv;
+    })
+    .set_else( [&]() 
+    {
+        n = 44;
+        return __crv;
+    })
+    .run(); 
+}
+```
+
+Now let's examine the `if_wrapper` class.
+
+```cpp
+class if_wrapper final
+{
+public:
+    template<class T>
+    if_wrapper(T lambda) {condition.reset(new bool_functor<T>(lambda));}
+
+    void run()
+    {
+        if(condition->run()) { if(thens) {
+            thens->run();
+        }}
+        else { if(elses) {
+            elses->run();
+        }}
+    }
+
+    ~if_wrapper() noexcept = default;
+
+    template<class T>
+    if_wrapper& set_then(T lambda) 
+    { 
+        thens.reset(new next_step_functor<T>(lambda)); return *this; 
+    }
+
+    template<class T>
+    if_wrapper& set_else(T lambda) 
+    { 
+        elses.reset(new next_step_functor<T>(lambda)); return *this; 
+    }
+
+private:
+    std::unique_ptr<bool_functor_base> condition;
+    std::unique_ptr<next_step_functor_base> thens;
+    std::unique_ptr<next_step_functor_base> elses;
+};
+```
+
+Now it is very clear why we needed the lambda created by the `IF` macro `(([&]()->bool { return (n == 42); }))`. Because we needed to create an object of type `class bool_functor` from it, which will give us the true-ness of the if condition. The bool functor class looks like:
+
+```cpp
+struct bool_functor_base
+{
+    virtual bool run() = 0;
+};
+
+template <class T>
+struct bool_functor final : public bool_functor_base
+{
+    bool_functor(T r) : runner(r) {}
+    virtual bool run() {return runner();}
+
+private:
+    T runner;
+};
+```
+
+Where the important part is the `bool run()` which in fact runs the condition and returns its true-ness.
+
+The two branches of the `if` are represented by the member variables `std::unique_ptr<next_step_functor_base> thens; std::unique_ptr<next_step_functor_base> elses;` and they behave very similar to the condition.
+
+the `run()` method of the `if_wrapper` class firstly checks the condition and then depending on the presence of the then and else branches executes the required operations.
+
 #### Support for looping
 
 There is a time when every application needs to iterate over a set of values, so I tried to re-implement the basic loop structures used in c++: The `for` loop, the `while` and the `do`-`while` have been reincarnated in the framework.
@@ -540,6 +671,30 @@ In case of debugging, the  `REPEAT`-`UNTIL` construct expands to the following:
 #define UNTIL(x) } while (x);
 ```
 
+##### Implementation of the looping constructs
+
+The logic and design of looping constructs are very similar to each other, they behave very similarly to the `IF` and each of them uses the same building blocks. There are the wrapper classes (`for_wrapper`, `repeat_wrapper`, `while_wrapper`) each of them with their functors for verifying the condition, and the steps to be executed. 
+
+The implementation in each of the `run()` method of the wrapper class follows the logic of the keyword it tries to emulate, with the exception that the commands are wrapped into a `try` - `catch` in order for `BREAK` and `CONTINUE` to function properly. Let's see for example the `run()` of the for wrapper:
+
+```cpp
+void run()
+{
+    for( initializer->run(); condition->run(); increment->run())
+    {
+        try
+        {
+            next_step c = body->run();
+        }
+        catch(next_step& c)
+        {
+            if(c == next_step::ns_break) break;
+            if(c == next_step::ns_continue) continue;
+        }
+    }
+}
+```
+
 #### Altering the control flow of the application
 
 Sometimes there is a need to alter the execution flow of a loop, C++ has support for this operation by providing the `continue` and `break` statements. The framework offers the `CONTINUE` and `BREAK` macros to achieve this goal.
@@ -624,6 +779,68 @@ void void_test(int& a)
 
 This is a seemingly annoying feature, but it easily can be fixed by simply changing the return type of the function to any non-void type. The reason is that the `RETURN` macro and the underlying C++ constructs should handle a wide variety of returnable types in a manner which can be handled easily by the programmer without causing confusion.
 
+###### Implementation of `CONTINUE`, `BREAK` and `RETURN`
+
+These keywords give the following when not compiled in debug mode:
+
+```cpp
+#define BREAK __crv = obf::next_step::ns_break; throw __crv;
+#define CONTINUE __crv = obf::next_step::ns_continue; throw __crv;
+
+#define RETURN(x) __rvlocal.reset(new obf::rvholder<std::remove_reference<decltype(x)>::type>(x,x));  throw __rvlocal;
+```
+
+`BREAK` and `CONTINUE` offer no surprises in the implementation and they comply to the expectation that has been formulated in the looping constructs: they throw a specific value, which is then caught in the local loop of the implementation, which handles it accordingly.
+
+However `RETURN` is a different kind of beast.
+
+It initializes the `__rvlocal` (ie: local return value) to the returned value and then throws it for the `catch` which is to be found in the `OBF_END` macro, which in its turn handles it correctly. 
+
+As you can see, there are three evaluations of  the `x` macro parameter, in order to avoid unwanted behaviour from your application do not use expressions which might turn out to be dangerous, such as: `RETURN (x++);` which will give a three times increment to your variable and an undefined behaviour.
+
+The `rvholder` class has the following body:
+
+```cpp
+struct base_rvholder
+{
+    virtual ~base_rvholder() = default;
+
+    template<class T>
+    operator T () const
+    {
+        return *reinterpret_cast<const T*>(get());
+    }
+    template<class T>
+    bool operator == (const T& o) const
+    {
+        return o == operator T ();
+    }
+    template<class T>
+    bool equals(const T& o) const
+    {
+        return o == *reinterpret_cast<const T*>(get());
+    }
+    virtual const void* get() const = 0;
+};
+
+template<class T>
+class rvholder : public base_rvholder
+{
+public:
+    rvholder(T t, T c) :base_rvholder(), v(t), check(c) {}
+    ~rvholder() = default;
+    virtual const void* get() const override 
+    {
+        return reinterpret_cast<const void*>(&v);
+    }
+private:
+    T v;
+    T check;
+};
+```
+
+As you can see there is a redundant `equals` method in the base class, and this is due to the fact that during development of  the framework, the Visual Studio compiler constantly crashed due to some internal error in the implementation of the `CASE` construct, and it always reported the error in the `operator ==` of the base class. In order to make it work I have added the extra `equals` member.
+
 ##### The `CASE` statement
 
 When programming in c++ the `switch`-`case` statement comes handy when there is a need to avoid long chains of `if` statements. The obfuscation framework provides a similar construct, although not exactly a functional and syntactical copy of the original `switch`-`case` construct.
@@ -682,6 +899,157 @@ In case the framework is used in debugging mode the macros expand to the followi
 #define DEFAULT default:
 ```
 
+###### Implementation of the `CASE` construct
+
+Certainly, the most complex of all constructs is the `CASE` one. Just the amount of macros supporting it is huge:
+
+```
+#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal;\
+                auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
+#define ENDCASE run(); } catch(obf::next_step& cv) {}
+#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>\
+                ( [&,__avholder]() -> std::remove_reference<decltype(__avholder)>::type \
+                { std::remove_reference<decltype(__avholder)>::type __c = (c); return __c;} )).
+#define DO add_entry( obf::body([&](){
+#define DONE return obf::next_step::ns_continue;})).
+#define OR join().
+#define DEFAULT add_default(obf::body([&](){
+```
+
+Let's dive into it.  
+
+The `case_wrapper` name should be already familiar from the various wrappers, but for the `CASE` the real workhorse is the `case_wrapper_base` class. The `case_wrapper` class is necesarry in order to make possible the `CASE` selection on `const` or non `const` objects, so the `case_wrapper` classes just derive from `case_wrapper_base` and specialize on the constness of the `CASE` expression. Please note that the `CASE` macro also evaluates more than one the `a` parameters, so writing `CASE(x++)` will lead to undefined behaviour.
+
+The `case_wrapper_base` class looks like:
+
+```cpp
+template <class CT>
+class case_wrapper_base
+{
+public:
+    explicit case_wrapper_base(const CT& v) : check(v), default_step(nullptr) {}
+    case_wrapper_base& add_entry(const case_instruction& lambda_holder) {
+        steps.push_back(&lambda_holder);
+        return *this;
+    }
+    case_wrapper_base& add_default(const case_instruction& lambda_holder) {
+        default_step = &lambda_holder;
+        return *this;
+    }
+    case_wrapper_base& join() {
+        return *this;
+    }
+    void run() const ; // body extracted from here, See later in the article for the description of it
+private:
+    std::vector<const case_instruction*> steps;
+    const CT check;
+    const case_instruction* default_step;
+};
+
+```
+
+The `const CT check;` is the expression that is being checked for the various case branches. Please note the `add_entry` and `add_default` methods, together with the `join()` method which allow chaining of expressions and method calls on the same object. The `std::vector<const case_instruction*> steps;` is a cumulative container for all the branch condition expressions and also bodies (code which is executed in a branch). This will introduce more complex code at a later stage, however it was necessary to have these two joined in the same container in order to allow as similar behaviour to the original way the C++ `case` works as possible.
+
+The inner mechanism of the `CASE` depends on the following classes:
+
+1. The `obf::case_instruction` class, which acts as a basic class for:
+2. `obf::branch` and
+3. `obf::body` classes.
+
+The `obf::branch` class is the class which gets instantiate by the `WHEN` macro in a call to the `add_entry` method of the `case_wrapper` obejct created by the `CASE`. Its role is to act as the condition chooser, and it looks like:
+
+```cpp
+template<class CT>
+class branch final : public case_instruction
+{
+public:
+    template<class T>
+    branch(T lambda) 
+    {
+        condition.reset(new any_functor<T>(lambda));
+    }
+    bool equals(const base_rvholder& rv, CT lv) const
+    {
+        return rv.equals(lv);
+    }
+    virtual next_step execute(const base_rvholder& against) const override
+    {
+        CT retv;
+        condition->run(const_cast<void*>(reinterpret_cast<const void*>(&retv)));
+        return equals(against,retv) ? next_step::ns_done : next_step::ns_continue;
+    }
+private:
+    std::unique_ptr<any_functor_base> condition;
+};
+```
+
+The `WHEN` macro has a more or less confusing lambda declaration which includes the local `__avholder` as being passed in by value. This is again due to the fact that various compilers decided to not to compile the same source code in the same way... well, some of them had a coup and bluntly declined to compile what the others already digested, that's why the ugly solution came into the existence.
+
+The code that is exectued upon entering a branch (including also the default branch) is created by the `DO` and the `DEFAULT` macros in a call to the and is thold in the `obf::body` class which is much simpler, just a few lines:
+
+```cpp
+class body final : public case_instruction
+{
+public:
+    template<class T>
+    body(T lambda) 
+    {
+        instructions.reset(new next_step_functor<T>(lambda));
+    }
+    virtual next_step execute(const base_rvholder&) const override
+    {
+        return instructions->run();
+    }
+private:
+    std::unique_ptr<next_step_functor_base> instructions;
+};
+```
+
+The most interesting (and longest) part of the case implementation is the `run()` method, presented here (in a somewhat stripped manner, I have removed all the security checks in order to have presentable code considering its length):
+
+```cpp
+void run() const
+{
+    auto it = steps.begin();
+    while(it != steps.end())
+    {
+        next_step enter = (*it)->execute(rvholder<CT>(check,check));
+        if(enter == next_step::ns_continue)
+        {
+            ++it;
+        }
+        else
+        {
+            while(! dynamic_cast<const body*>(*it)  && it != steps.end() )
+            {
+                ++it;
+            }
+
+            // found the first body.
+            while(it != steps.end())
+            {
+                if(dynamic_cast<const body*>(*it))
+                {
+                    (*it)->execute(rvholder<CT>(check,check));
+                }
+                ++it;
+            }
+        }
+    }
+
+    if(default_step)
+    {
+        default_step->execute(rvholder<CT>(check,check));
+    }
+}
+```
+
+As a first step the code looks for the first branch which satisfies the condition (if `(*it)->execute(rvholder<CT>(check,check));` returns `next_step::ns_done` it means it has found a branch satisfying the `check`). In this case it skips all the other conditions for this branch and starts execution the code for all the `body` classes that are in the object. In case a `BREAK` statement was issued while executing the bodies the code will throw and the `catch` in `ENDCASE` (`catch(obf::next_step& cv)` will swallow it, and will return the execution to the normal flow.
+
+The last resort is that if we have a `default_step` and we are still in the body of the run (ie: noone issued a `BREAK` command) it also executes it. 
+
+And with this we have presented the entire framework, together with implementation details, and now we are ready to catch up with our initial goal.
+
 # The naive licensing algorithm revisited
 
 Now, that we are aware of a library that offers code obfuscation without too much headaches from our side (at least, this was the intention of the author) let's re-consider the implementation of the naive licensing algorithm using these new terms. So here it comes:
@@ -726,7 +1094,7 @@ bool check_license1(const char* user, const char* users_license)
 }
 ```
 
-Indeed, it looks a little bit more "obfuscated" than the original source, but after compilation it adds a great layer of extra code around the standard logic, and the generated binary is much more cumbersome to understand than the one "before" the obfuscation. And due to the sheer size of the generated code, we simply omit publishing it here.
+Indeed, it looks a little bit more "obfuscated" than the original source, but after compilation it adds a great layer of extra code around the standard logic, and the generated binary is much more cumbersome to understand than the one "before" the obfuscation. And due to the sheer size of the generated assembly code, we simply omit publishing it here.
 
 # Discommodities of the framework
 
@@ -738,7 +1106,7 @@ And last, but not least, the numeric value wrappers do not work with floating po
 
 # Some requirements
 
-The code is written also with "older" compilers in mind, so not all the latest and greatest features of C++14 and 17 are being included. CLang version 3.4.1 happily compiles the source code, so does g++ 4.8.2. Visual Studio 2015, Update 3 is also compiling the code.
+The code is written also with "older" compilers in mind, so not all the latest and greatest features of C++14 and 17 are being included. CLang version 3.4.1 happily compiles the source code, so does g++ 4.8.2. Visual Studio 2015 is also compiling the code.
 
 Unit testing is done using the Boost Unit test framework. The build system for the unit tests is CMake and there is support for code coverage (the last two were tested only under linux).
 

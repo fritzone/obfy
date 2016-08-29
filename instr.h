@@ -305,7 +305,7 @@ private:
 
 /* supporting implementation for the REPEAT/UNTIL macros*/
 
-class repeat_wrapper
+class repeat_wrapper final
 {
 public:
     repeat_wrapper():body(nullptr), condition(nullptr) {}
@@ -526,7 +526,6 @@ public:
     void run() const
     {
         auto it = steps.begin();
-        bool at_least_one_execeuted = false;
         while(it != steps.end())
         {
             bool increased = false;
@@ -557,7 +556,6 @@ public:
                         if(dynamic_cast<const body*>(*it))
                         {
                             (*it)->execute(rvholder<CT>(check,check));
-                            at_least_one_execeuted = true;
                         }
                         increased = true;
                         ++it;
@@ -568,7 +566,6 @@ public:
             {
                 throw(std::string("invalid type:") + typeid(*it).name());
             }
-
 
             // just for safety
             if(!increased)
@@ -821,9 +818,11 @@ DEFINE_EXTRA(2, extra_addition);
 #define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
 
-#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal; auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
+#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal;\
+                auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
 #define ENDCASE run(); } catch(obf::next_step& cv) {}
-#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>( [&,__avholder]() -> std::remove_reference<decltype(__avholder)>::type\
+#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>\
+                ( [&,__avholder]() -> std::remove_reference<decltype(__avholder)>::type \
                 { std::remove_reference<decltype(__avholder)>::type __c = (c); return __c;} )).
 #define DO add_entry( obf::body([&](){
 #define DONE return obf::next_step::ns_continue;})).

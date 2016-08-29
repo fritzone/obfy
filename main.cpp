@@ -6,6 +6,19 @@
 
 #include "instr.h"
 
+int simple_if()
+{
+    int n = 42;
+    OBF_BEGIN
+       IF( n == 42)
+            n = 43;
+       ELSE
+            n = 44;
+       ENDIF
+    OBF_END
+    return n;
+}
+
 int numeric_wrapper_returner()
 {
     int n;
