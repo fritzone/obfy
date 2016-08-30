@@ -820,7 +820,7 @@ DEFINE_EXTRA(2, extra_addition);
 
 #define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal;\
                 auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
-#define ENDCASE run(); } catch(obf::next_step& cv) {}
+#define ENDCASE run(); } catch(obf::next_step&) {}
 #define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>\
                 ( [&,__avholder]() -> std::remove_reference<decltype(__avholder)>::type \
                 { std::remove_reference<decltype(__avholder)>::type __c = (c); return __c;} )).
