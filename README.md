@@ -643,32 +643,30 @@ In case the compilation is done in debugging mode, the `WHILE` evaluates to:
 #define ENDWHILE }
 ```
 
-##### The `REPEAT` - `UNTIL` construct
+##### The `REPEAT` - `AS_LONG_AS` construct posing as `do` - `while`
 
-Due to the complexity of the solution, the familiar `do` - `while` construct of the C++ language had to be altered a bit, since the `WHILE` "keyword" was already taken for the benefit of the `while` loop, so I borrowed the `repeat` - `until` keywords to achieve this goal.
+Due to the complexity of the solution, the familiar `do` - `while` construct of the C++ language had to be renamed a bit, since the `WHILE` "keyword" was already taken for the benefit of the `while` loop, so I created the `REPEAT` - `AS_LONG_AS` keywords to achieve this goal.
 
-This is the syntax of the `REPEAT`-`UNTIL` construct:
+This is the syntax of the `REPEAT` - `AS_LONG_AS` construct:
 
     REPEAT
     ....statements
-    UNTIL( expression )
+    AS_LONG_AS( expression )
 
 This will execute the `statements` at least once, and then depending on the value of the `expression` either will continue the execution, or will stop and exit the loop. If the expression is `true` it will continue the execution from the beginning of the loop, if it is `false` it will stop the execution and exit the loop.
-
-Please note, this is contradictory to the `repeat` - `until` logic offered by the Pascal language (which chose to continue the looping on a `false` expression), and it is similar the way the C++ language (and other similar languages) resolves the `do` - `while` looping.
 
 And here is an example:
 
     REPEAT
         std::cout << a << std::endl;
         ++ V(a);
-    UNTIL( V(a) != N(12) )
+    AS_LONG_AS( V(a) != N(12) )
 
-In case of debugging, the  `REPEAT`-`UNTIL` construct expands to the following:
+In case of debugging, the  `REPEAT` - `AS_LONG_AS` construct expands to the following:
 
 ```cpp
 #define REPEAT   do {
-#define UNTIL(x) } while (x);
+#define AS_LONG_AS(x) } while (x);
 ```
 
 ##### Implementation of the looping constructs

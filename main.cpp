@@ -194,7 +194,7 @@ int repeat_loop_test()
         REPEAT
             ++V(a);
             V(n) = V(a);
-        UNTIL ( V(a) <= N(10))
+        AS_LONG_AS ( V(a) <= N(10))
 
     OBF_END
     return n;
@@ -214,7 +214,7 @@ int repeat_loop_test_break()
                 ++V(a);
                 V(n) = V(a);
         ENDIF
-        UNTIL ( V(a) <= N(10))
+        AS_LONG_AS ( V(a) <= N(10))
 
     OBF_END
     return n;
@@ -235,7 +235,7 @@ int repeat_loop_test_continue()
             ENDIF
 
             V(n) ++;
-        UNTIL ( V(a) < N(10))
+        AS_LONG_AS ( V(a) < N(10))
 
     OBF_END
     return n;

@@ -299,7 +299,7 @@ private:
 
 /* c++ control structures implementation */
 
-/* supporting implementation for the REPEAT/UNTIL macros*/
+/* supporting implementation for the REPEAT/AS_LONG_AS macros*/
 
 class repeat_wrapper final
 {
@@ -760,7 +760,7 @@ OBF_TYPE(unsigned long long int)
 #define ENDWHILE }
 
 #define REPEAT   do {
-#define UNTIL(x) } while ((x));
+#define AS_LONG_AS(x) } while ((x));
 
 #define CASE(a) switch (a) {
 #define ENDCASE }
@@ -803,7 +803,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define RETURN(x) __rvlocal.reset(new obf::rvholder<std::remove_reference<decltype(x)>::type>(x,x));  throw __rvlocal;
 
 #define REPEAT { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::repeat_wrapper().set_body( [&]() {
-#define UNTIL(x) return __crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
+#define AS_LONG_AS(x) return __crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
 
 #define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
