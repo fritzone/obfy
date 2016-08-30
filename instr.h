@@ -58,7 +58,7 @@ const int seed = DigitToInt(time[7]) +
                  DigitToInt(time[0]) * 36000;
 
 template<int N>
-struct MetaRandomGenerator
+struct MetaRandomGenerator final
 {
 private:
     static constexpr unsigned a = 16807;
@@ -76,13 +76,13 @@ public:
 };
 
 template<>
-struct MetaRandomGenerator<0>
+struct MetaRandomGenerator<0> final
 {
     static constexpr unsigned value = seed;
 };
 
 template<int N, int M>
-struct MetaRandom
+struct MetaRandom final
 {
     static const int value = MetaRandomGenerator<N + 1>::value % M;
 };
@@ -97,7 +97,6 @@ struct MetaRandom
 
 #define COMPARISON_OPERATOR(x) \
     bool operator x (const T& ov) { return (v x ov); }
-
 
 /* simple reference holder class, mostly for dealing with holding variables */
 template <typename T>
@@ -130,7 +129,6 @@ public:
     refholder<T>& operator++() { ++ v; return *this; }
     refholder<T>& operator--() { -- v; return *this; }
 
-
     /* post increment/decrement */
     refholder<T> operator++(int) { refholder<T> rv(*this); operator ++(); return rv; }
     refholder<T> operator--(int) { refholder<T> rv(*this); operator --(); return rv; }
@@ -152,7 +150,6 @@ private:
     /* The root of all evil */
     volatile T& v;
 };
-
 
 /* simple reference holder class, for holding reference of constant variables */
 template <typename T>
@@ -239,7 +236,7 @@ private:
 
 
 /* what the RETURN/BREAK/CONTINUE will return while running from inside a loop block*/
-enum class next_step
+enum class next_step final
 {
     ns_break,
     ns_continue,
@@ -251,7 +248,6 @@ enum class next_step
 struct next_step_functor_base
 {
     virtual next_step run() = 0;
-
 };
 
 template <class T>
@@ -604,12 +600,6 @@ public:
 
 /* syntactic sugar */
 
-template<typename X>
-refholder<X> RH (X& a)
-{
-    return refholder<X>(a);
-}
-
 class stream_helper {};
 template <typename T>
 refholder<T> operator << (stream_helper, T& a)
@@ -649,7 +639,7 @@ private:
 };
 
 template <class T>
-class extra_xor <const T> final: public basic_extra
+class extra_xor <const T> final : public basic_extra
 {
 public:
     extra_xor(const T&) {}
@@ -699,7 +689,7 @@ public:
 };
 
 template <typename T, int N>
-class extra_chooser
+class extra_chooser final
 {
     using type=basic_extra; // intentionally private
 };
