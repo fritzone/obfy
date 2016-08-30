@@ -236,7 +236,7 @@ private:
 
 
 /* what the RETURN/BREAK/CONTINUE will return while running from inside a loop block*/
-enum class next_step final
+enum class next_step 
 {
     ns_break,
     ns_continue,
