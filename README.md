@@ -603,7 +603,7 @@ ENDFOR
 
 The same restriction concerning the variable declaration in the `initializer` as in the case of the `IF` applies for the FOR macro too, so it is not valid to write:
 
-    FOR(int x=0; x<10; x++)
+    FOR(int x=0, x<10, x++)
 
 and the reasons are again the same as presented above.
 
