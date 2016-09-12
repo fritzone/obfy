@@ -1,7 +1,9 @@
 #if !defined( WIN32 )
-	#define BOOST_TEST_MAIN
-    #define BOOST_TEST_DYN_LINK
-	#include <boost/test/auto_unit_test.hpp>
+    #ifdef UNIT_TESTS
+        #define BOOST_TEST_MAIN
+        #define BOOST_TEST_DYN_LINK
+        #include <boost/test/auto_unit_test.hpp>
+    #endif
 #endif
 
 #include "instr.h"
@@ -332,7 +334,7 @@ ATest class_test(int& a)
     OBF_END
 }
 
-#if !defined (WIN32)
+#if !defined (WIN32) && defined (UNIT_TESTS)
 
 BOOST_AUTO_TEST_CASE(test_wrappers)
 {

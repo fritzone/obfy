@@ -1114,6 +1114,10 @@ The library is a header only library, released in the public domain under the MI
 
 You can get it from https://github.com/fritzone/obfy 
 
+# Conclusion
+
+History has shown us, that if a piece of software is crackable, it will be cracked. And it just depends on the dedication, time spent, and effort invested by the software cracker when that piece of a software is to be proven crackable. There is no swiss army knife when it comes about protecting your software against malicious interference, because from the moment it has left your build server and it was dowloaded, the software is out of your hands, and entered an uncontrollable environment. The only sensible act you can do to protect your intellectual property is to make it as hard to crack as possible. This little framework provides a few means in order to achieve this goal, and by making it open source, freely available and modifiable to the developer community we can just hope this will give it an advantage by allowing everyone to tailor it in order to suit their needs best.
+
 # References
 
 [Andrivet] - Random Generator by Sebastien Andrivet - https://github.com/andrivet/ADVobfuscator
