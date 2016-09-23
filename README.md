@@ -14,8 +14,6 @@ The naive licensing algorithm is a very simple implementation of checking the va
 
 Since the license checking code is usually shipped with the software product in compiled form, I'll put in here both the generated code (in Intel x86 assembly) since that is what the crackers will see after a successful disassembly of the executable but also the C++ code for the licensing algorithm. In order to not to pollute the precious paper space with unintelligible binary code I will restrain myself to include only the relevant bits of the code, with regard to the parts which naively determines whether a supplied license is valid or not, together with the C++ code, which was used to generate the binary code.
 
-The code was compiled using Microsoft Visual C++ (2015), in Release mode with optimization settings to favour a smaller executable, and I also have used the built in debugger of the VS IDE, to have a proper matching of the generated code with the source, to facilitate the educational aspect of this article.
-
 The following is the source code of the licensing algorithm:
 
 ```cpp
@@ -46,11 +44,13 @@ bool check_license(const char* user, const char* users_license)
 }
 ```
 
-The license which this method validates comes in the form of the following "ABCD-EFGH-IJKL-MNOP" and there is an associated `generate_license` method which will be presented as an appendix to this article.
+The license which this method validates comes in the form of the following "ABCD-EFGH-IJKL-MNOP" and there is an associated `generate_license` method which will be presented as an Appendix for this article.
 
 Also, the naivety of this method is easily exposed by using the very proper name of `check_license` which immediately reveals to the up-to-be attacker where to look for the code checking the ... license. If you want to make harder for the attacker the identification of the license checking method I'd recommend either to use some irrelevant names or just strip all symbols from the executable as part of the release process.
 
-The interesting part is the binary code of the method obtained via compilation of the corresponding C++ code. It is intentionally NOT the Debug version, since we hardly should ship debug version of the code to our customers.
+The interesting part is the binary code of the method obtained via compilation of the corresponding C++ code (which we obtained by compiling it with Microsoft Visual C++ 2015). I have compiled it in Release mode (with Debug information included for educational purposes) but it is intentionally NOT the Debug version, since we hardly should ship debug version of the code to our customers.
+
+I also have used the built in debugger of the VS IDE, to visualize the generated code next to the source, in order to facilitate the a better understanding of the relation between these two.
 
 ```cpp
 if (license[lic_ctr] != letters[current % sizeof letters])
@@ -916,7 +916,7 @@ Certainly, the most complex of all constructs is the `CASE` one. Just the amount
 
 Let's dive into it.  
 
-The `case_wrapper` name should be already familiar from the various wrappers, but for the `CASE` the real workhorse is the `case_wrapper_base` class. The `case_wrapper` class is necesarry in order to make possible the `CASE` selection on `const` or non `const` objects, so the `case_wrapper` classes just derive from `case_wrapper_base` and specialize on the constness of the `CASE` expression. Please note that the `CASE` macro also evaluates more than one the `a` parameters, so writing `CASE(x++)` will lead to undefined behaviour.
+The `case_wrapper` name should be already familiar from the various wrappers, but for the `CASE` the real workhorse is the `case_wrapper_base` class. The `case_wrapper` class is necesarry in order to make possible the `CASE` selection on `const` or non `const` objects, so the `case_wrapper` classes just derives from `case_wrapper_base` and specializes on the `const`ness of the `CASE` expression. Please note that the `CASE` macro also evaluates more than once the `a` parameters, so writing `CASE(x++)` will lead to undefined behaviour.
 
 The `case_wrapper_base` class looks like:
 
@@ -946,7 +946,7 @@ private:
 
 ```
 
-The `const CT check;` is the expression that is being checked for the various case branches. Please note the `add_entry` and `add_default` methods, together with the `join()` method which allow chaining of expressions and method calls on the same object. The `std::vector<const case_instruction*> steps;` is a cumulative container for all the branch condition expressions and also bodies (code which is executed in a branch). This will introduce more complex code at a later stage, however it was necessary to have these two joined in the same container in order to allow as similar behaviour to the original way the C++ `case` works as possible.
+The `const CT check;` is the expression that is being checked for the various case branches. Please note the `add_entry` and `add_default` methods, together with the `join()` method which allow chaining of expressions and method calls on the same object. The `std::vector<const case_instruction*> steps;` is a cumulative container for all the branch condition expressions and also bodies (code which is executed in a branch). This will introduce more complex code at a later stage, however it was necessary to have these two joined in the same container in order to allow as similar behaviour to the original way the C++ `case` works, as possible.
 
 The inner mechanism of the `CASE` depends on the following classes:
 
@@ -954,7 +954,7 @@ The inner mechanism of the `CASE` depends on the following classes:
 2. `obf::branch` and
 3. `obf::body` classes.
 
-The `obf::branch` class is the class which gets instantiate by the `WHEN` macro in a call to the `add_entry` method of the `case_wrapper` obejct created by the `CASE`. Its role is to act as the condition chooser, and it looks like:
+The `obf::branch` class is the class which gets instantiated by the `WHEN` macro in a call to the `add_entry` method of the `case_wrapper` object created by the `CASE`. Its role is to act as the condition chooser, and it looks like:
 
 ```cpp
 template<class CT>
@@ -983,7 +983,7 @@ private:
 
 The `WHEN` macro has a more or less confusing lambda declaration which includes the local `__avholder` as being passed in by value. This is again due to the fact that various compilers decided to not to compile the same source code in the same way... well, some of them had a coup and bluntly declined to compile what the others already digested, that's why the ugly solution came into the existence.
 
-The code that is exectued upon entering a branch (including also the default branch) is created by the `DO` and the `DEFAULT` macros in a call to the and is thold in the `obf::body` class which is much simpler, just a few lines:
+The code that is executed upon entering a branch (including also the default branch) is created by the `DO` and the `DEFAULT` macros. They both create an instance of the `obf::body` class, and the `DO` adds it to the steps of the case wrapper class, and the `DEFAULT` calls  the `add_default` member in order to specify a default branch. The `obf::body` class is much simpler, just a few lines:
 
 ```cpp
 class body final : public case_instruction
@@ -1009,25 +1009,19 @@ The most interesting (and longest) part of the case implementation is the `run()
 void run() const
 {
     auto it = steps.begin();
-    while(it != steps.end())
-    {
+    while(it != steps.end()) {
         next_step enter = (*it)->execute(rvholder<CT>(check,check));
-        if(enter == next_step::ns_continue)
-        {
+        if(enter == next_step::ns_continue) {
             ++it;
         }
-        else
-        {
-            while(! dynamic_cast<const body*>(*it)  && it != steps.end() )
-            {
+        else {
+            while(! dynamic_cast<const body*>(*it)  && it != steps.end() ) {
                 ++it;
             }
 
             // found the first body.
-            while(it != steps.end())
-            {
-                if(dynamic_cast<const body*>(*it))
-                {
+            while(it != steps.end()) {
+                if(dynamic_cast<const body*>(*it)) {
                     (*it)->execute(rvholder<CT>(check,check));
                 }
                 ++it;
@@ -1035,14 +1029,13 @@ void run() const
         }
     }
 
-    if(default_step)
-    {
+    if(default_step) {
         default_step->execute(rvholder<CT>(check,check));
     }
 }
 ```
 
-As a first step the code looks for the first branch which satisfies the condition (if `(*it)->execute(rvholder<CT>(check,check));` returns `next_step::ns_done` it means it has found a branch satisfying the `check`). In this case it skips all the other conditions for this branch and starts execution the code for all the `body` classes that are in the object. In case a `BREAK` statement was issued while executing the bodies the code will throw and the `catch` in `ENDCASE` (`catch(obf::next_step& cv)` will swallow it, and will return the execution to the normal flow.
+As a first step the code looks for the first branch which satisfies the condition (if `(*it)->execute(rvholder<CT>(check,check));` returns `next_step::ns_done` it means it has found a branch satisfying the `check`). In this case it skips all the other conditions for this branch and starts execution the code for all the `obf::body` classes that are in the object. In case a `BREAK` statement was issued while executing the bodies the code will throw and the `catch` in `ENDCASE` (`catch(obf::next_step& cv)` will swallow it, and will return the execution to the normal flow.
 
 The last resort is that if we have a `default_step` and we are still in the body of the run (ie: noone issued a `BREAK` command) it also executes it. 
 
@@ -1106,7 +1099,7 @@ And last, but not least, the numeric value wrappers do not work with floating po
 
 The code is written also with "older" compilers in mind, so not all the latest and greatest features of C++14 and 17 are being included. CLang version 3.4.1 happily compiles the source code, so does g++ 4.8.2. Visual Studio 2015 is also compiling the code.
 
-Unit testing is done using the Boost Unit test framework. The build system for the unit tests is CMake and there is support for code coverage (the last two were tested only under linux).
+Unit testing is done using the Boost Unit test framework. The build system for the unit tests is CMake and there is support for code coverage (the last two were tested only under Linux).
 
 # License and getting the framework
 
@@ -1117,6 +1110,45 @@ You can get it from https://github.com/fritzone/obfy
 # Conclusion
 
 History has shown us, that if a piece of software is crackable, it will be cracked. And it just depends on the dedication, time spent, and effort invested by the software cracker when that piece of a software is to be proven crackable. There is no swiss army knife when it comes about protecting your software against malicious interference, because from the moment it has left your build server and it was dowloaded, the software is out of your hands, and entered an uncontrollable environment. The only sensible act you can do to protect your intellectual property is to make it as hard to crack as possible. This little framework provides a few means in order to achieve this goal, and by making it open source, freely available and modifiable to the developer community we can just hope this will give it an advantage by allowing everyone to tailor it in order to suit their needs best.
+
+# Appendix
+
+## The license generating algorithm
+
+As promised, here is the naive license generating algorithm. Any further improvements to it are more than welcome.
+
+```cpp
+static const char letters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+std::string generate_license(const char* user)
+{
+    if(!user) return "";
+
+    // the license will contain only these character
+    // 16 chars + 0
+    char result[17] = { 0 };
+    size_t l = strlen(user), lic_ctr = 0;
+    int add = 0;
+    while (lic_ctr < 16)
+    {
+        size_t i = lic_ctr;
+        i %= l;
+        int current = 0;
+        while (i < l)
+        {
+            current += user[i];
+            i++;
+        }
+        current += add;
+        add++;
+
+        result[lic_ctr] = letters[current % sizeof letters];
+        lic_ctr++;
+    }
+
+    return std::string(result);
+}
+```
 
 # References
 
