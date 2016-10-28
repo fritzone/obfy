@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/fritzone/obfy.svg?branch=master)](https://travis-ci.org/fritzone/obfy)
+
 # Attacking the licensing problems with C++
 
 From the early days of the commercialization of computer software, malicious programmers, also known as crackers have been continuously nettling the programmers of aforementioned software by constantly bypassing the clever licensing mechanisms they have implemented in their software, thus causing financial damages to the companies providing the software.
