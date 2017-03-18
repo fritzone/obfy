@@ -236,7 +236,7 @@ private:
 
 
 /* what the RETURN/BREAK/CONTINUE will return while running from inside a loop block*/
-enum class next_step 
+enum class next_step
 {
     ns_break,
     ns_continue,
@@ -312,7 +312,7 @@ public:
         {
             try
             {
-                next_step c = body->run();
+                body->run();
             }
             catch(next_step& c)
             {
@@ -356,7 +356,7 @@ public:
         {
             try
             {
-                next_step c = body->run();
+                body->run();
             }
             catch(next_step& c)
             {
@@ -393,7 +393,7 @@ public:
         {
             try
             {
-                next_step c = body->run();
+                body->run();
             }
             catch(next_step& c)
             {
@@ -628,10 +628,10 @@ public:
 		volatile T lv = MetaRandom<__COUNTER__, 4096>::value;
         v ^= lv;
     }
-    virtual ~extra_xor() 
+    virtual ~extra_xor()
 	{
 		volatile T lv = MetaRandom<__COUNTER__ - 1, 4096>::value;
-		v ^= lv; 
+		v ^= lv;
 	}
 
 private:
@@ -649,15 +649,15 @@ template <class T>
 class extra_addition final : public basic_extra
 {
 public:
-    extra_addition(T& a) : v(a) 
-	{ 
+    extra_addition(T& a) : v(a)
+	{
 		volatile T lv = MetaRandom<__COUNTER__, 4096>::value;
-		v += lv; 
+		v += lv;
 	}
-    virtual ~extra_addition() 
+    virtual ~extra_addition()
 	{
 		volatile T lv = MetaRandom<__COUNTER__ - 1, 4096>::value;
-		v -= lv; 
+		v -= lv;
 	}
 private:
     volatile T& v;
