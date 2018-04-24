@@ -256,6 +256,14 @@ int case_tester()
 
         CASE ( something )
 
+            WHEN("Y") DO
+                BREAK;
+            DONE
+
+            WHEN("X") DO
+                BREAK;
+            DONE
+
             WHEN("A") OR WHEN("B") DO
                 V(n) = N(42);
                 BREAK;

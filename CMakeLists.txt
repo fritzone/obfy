@@ -17,16 +17,16 @@ if(unit_tests)
     if(NOT Boost_FOUND)
         set(unit_tests OFF)
     else()
-        add_definition("-DUNIT_TESTS")
+        add_definitions("-DUNIT_TESTS")
         include_directories(${Boost_INCLUDE_DIRS})
     endif() 
 
     enable_testing()
 
     target_link_libraries(obfy_test
-    		    ${Boost_FILESYSTEM_LIBRARY}
-    		    ${Boost_SYSTEM_LIBRARY}
-                    ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
+        ${Boost_FILESYSTEM_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
+        ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
     )
 
     add_test(NAME obfy_test COMMAND obfy_test)
