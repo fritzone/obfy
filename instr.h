@@ -525,7 +525,7 @@ public:
         while(it != steps.end())
         {
             bool increased = false;
-            // see if  this is a branch or body
+            // see if this is a branch
             if(dynamic_cast<const branch<CT>*>(*it) || dynamic_cast<const branch<const CT>*>(*it))
             {
                 // branch. Execute it, see if it returns true or false
@@ -557,6 +557,10 @@ public:
                         ++it;
                     }
                 }
+            }
+            else if(dynamic_cast<const body*>(*it))
+            {
+                // skip body
             }
             else
             {
