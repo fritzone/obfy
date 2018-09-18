@@ -344,6 +344,8 @@ ATest class_test(int& a)
 
 #if !defined (WIN32) && defined (UNIT_TESTS)
 
+#include <stdint.h>
+
 BOOST_AUTO_TEST_CASE(test_wrappers)
 {
     BOOST_CHECK_EQUAL(numeric_wrapper_returner(), 42);
@@ -385,6 +387,13 @@ BOOST_AUTO_TEST_CASE(return_test)
     ATest x = class_test(a);
     BOOST_CHECK_EQUAL(a, 42);
     BOOST_CHECK_EQUAL(x.x, 42);
+}
+
+BOOST_AUTO_TEST_CASE(bignumber)
+{
+    int64_t bigNumber;
+    V(bigNumber) = N(1537232811123);
+    BOOST_CHECK_EQUAL(bigNumber,1537232811123);
 }
 
 #else
