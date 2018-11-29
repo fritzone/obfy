@@ -39,6 +39,15 @@ int simple_variable_wrapper_returner()
 	return n;
 }
 
+int simple_variable_wrapper_min_eq()
+{
+	int n = 64;
+	OBF_BEGIN
+		V(n) -= n << N(2);
+	OBF_END
+	return n;
+}
+
 
 int variable_wrapper_returner()
 {
@@ -349,6 +358,8 @@ ATest class_test(int& a)
 BOOST_AUTO_TEST_CASE(test_wrappers)
 {
     BOOST_CHECK_EQUAL(numeric_wrapper_returner(), 42);
+    BOOST_CHECK_EQUAL(simple_variable_wrapper_min_eq(), -192);
+
     BOOST_CHECK_EQUAL(variable_wrapper_returner(), 42);
     BOOST_CHECK_EQUAL(variable_wrapper_operations(), 42);
 }
