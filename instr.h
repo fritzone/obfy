@@ -247,6 +247,7 @@ enum class next_step
 
 struct next_step_functor_base
 {
+    virtual ~next_step_functor_base() = default;
     virtual next_step run() = 0;
 };
 
@@ -262,6 +263,7 @@ private:
 
 struct bool_functor_base
 {
+    virtual ~bool_functor_base() = default;
     virtual bool run() = 0;
 };
 
@@ -277,6 +279,7 @@ private:
 
 struct any_functor_base
 {
+    virtual ~any_functor_base() = default;
     virtual void run(void*) const = 0;
 };
 
