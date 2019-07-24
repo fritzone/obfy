@@ -106,6 +106,7 @@ public:
     /* Construction, destruction */
     refholder() = delete;
     refholder(T& pv) : v(pv) {}
+    refholder(const refholder& ov) : v(ov.v) {}
     refholder(T&&) = delete;
 
     ~refholder() = default;
