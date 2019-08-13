@@ -813,7 +813,7 @@ DEFINE_EXTRA(2, extra_addition);
 #define REPEAT { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::repeat_wrapper().set_body( [&]() {
 #define AS_LONG_AS(x) return __crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
 
-#define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal;
+#define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal; (void)__crv;
 #define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
 
 #define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal;\
