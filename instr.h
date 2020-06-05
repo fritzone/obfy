@@ -719,8 +719,8 @@ private:
 
 struct ObfZero { enum {value = 0}; };
 struct ObfOne { enum {value = 1}; };
-#define OBF_ZERO(t) template <> struct Num<t,0> final : public ObfZero { t v = value; };
-#define OBF_ONE(t) template <> struct Num<t,1> final : public ObfOne { t v = value; };
+#define OBF_ZERO(t) template <> struct Num<t,0> final : public ObfZero { t v = value; t get() const { return v;}; };
+#define OBF_ONE(t) template <> struct Num<t,1> final : public ObfOne { t v = value; t get() const { return v;}; };
 #define OBF_TYPE(t) OBF_ZERO(t) OBF_ONE(t)
 
 OBF_TYPE(bool)
