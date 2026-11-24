@@ -30,9 +30,20 @@
 #include <vector>
 #include <type_traits>
 #include <utility>
+#include <stdexcept>
 
 #ifndef MAX_BOGUS_IMPLEMENTATIONS
 #define MAX_BOGUS_IMPLEMENTATIONS 3
+#endif
+
+#ifndef OBF_CONSTANT_MASK_BITS
+// Number of low bits of a wrapped constant N(x) that are masked by the
+// compile-time XOR. The original value was effectively 12 (a mask modulus of
+// 4096). 30 keeps the masked value a positive int, so that the Num<> bit
+// recursion still terminates, while covering far more of the constant.
+// Constants wider than this (e.g. 64-bit values) still keep their top bits in
+// the clear; raise MAX_BOGUS_IMPLEMENTATIONS / supply OBF_SEED for more entropy.
+#define OBF_CONSTANT_MASK_BITS 30
 #endif
 
 namespace obf
@@ -48,14 +59,25 @@ namespace obf
  * 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef OBF_SEED
+// Build-time entropy for the whole generator. __TIME__ on its own yields at most
+// 86400 distinct seeds and is trivially guessable from the build time, so for
+// real obfuscation strength pass an unpredictable value on the command line,
+// e.g. -DOBF_SEED=$RANDOM (or a value from your build system).
+#define OBF_SEED 0
+#endif
+
 constexpr char time[] = __TIME__;
+constexpr char date[] = __DATE__;
 constexpr int DigitToInt(char c) { return c - '0'; }
-const int seed = DigitToInt(time[7]) +
-                 DigitToInt(time[6]) * 10 +
-                 DigitToInt(time[4]) * 60 +
-                 DigitToInt(time[3]) * 600 +
-                 DigitToInt(time[1]) * 3600 +
-                 DigitToInt(time[0]) * 36000;
+const int seed = (OBF_SEED)
+               ^ (DigitToInt(time[7]) +
+                  DigitToInt(time[6]) * 10 +
+                  DigitToInt(time[4]) * 60 +
+                  DigitToInt(time[3]) * 600 +
+                  DigitToInt(time[1]) * 3600 +
+                  DigitToInt(time[0]) * 36000)
+               ^ ((date[4] * 31 + date[5]) << 11);
 
 template<int N>
 struct MetaRandomGenerator final
@@ -205,7 +227,7 @@ struct base_rvholder
     template<class T>
     operator T () const
     {
-        return *reinterpret_cast<const T*>(get());
+        return convert<T>(std::is_arithmetic<T>());
     }
 
     template<class T>
@@ -217,10 +239,49 @@ struct base_rvholder
     template<class T>
     bool equals(const T& o) const
     {
-        return o == *reinterpret_cast<const T*>(get());
+        return o == *static_cast<const T*>(checked_get(typeid(T)));
     }
 
     virtual const void* get() const = 0;
+
+private:
+
+    virtual const std::type_info& stored_type() const = 0;
+    virtual bool is_floating() const = 0;
+    virtual bool is_signed() const = 0;
+    virtual long double as_floating() const = 0;
+    virtual long long as_signed() const = 0;
+    virtual unsigned long long as_unsigned() const = 0;
+
+    // Returns the stored object pointer only if the requested type matches the
+    // type that was actually stored; otherwise the request is a type mismatch
+    // and we fail loudly instead of reinterpreting unrelated bytes.
+    const void* checked_get(const std::type_info& requested) const
+    {
+        if(requested != stored_type())
+        {
+            throw std::bad_cast();
+        }
+        return get();
+    }
+
+    // Arithmetic target: perform a real value conversion (never a bit-cast), so
+    // RETURN-ing e.g. a short where an int is expected widens correctly.
+    template<class T>
+    T convert(std::true_type /* arithmetic target */) const
+    {
+        if(is_floating()) return static_cast<T>(as_floating());
+        if(is_signed())   return static_cast<T>(as_signed());
+        return static_cast<T>(as_unsigned());
+    }
+
+    // Non-arithmetic target (class/enum/pointer): the stored type must match
+    // exactly, then the stored object is copied.
+    template<class T>
+    T convert(std::false_type /* class/other target */) const
+    {
+        return *static_cast<const T*>(checked_get(typeid(T)));
+    }
 };
 
 template<class T>
@@ -229,8 +290,27 @@ class rvholder : public base_rvholder
 public:
     rvholder(T t, T c) :base_rvholder(), v(t), check(c) {}
     ~rvholder() = default;
-    virtual const void* get() const override {return reinterpret_cast<const void*>(&v);}
+    virtual const void* get() const override {return static_cast<const void*>(&v);}
+
 private:
+
+    virtual const std::type_info& stored_type() const override { return typeid(T); }
+    virtual bool is_floating() const override { return std::is_floating_point<T>::value; }
+    virtual bool is_signed() const override { return std::is_signed<T>::value; }
+
+    virtual long double as_floating() const override { return to_floating(std::is_arithmetic<T>()); }
+    virtual long long as_signed() const override { return to_signed(std::is_arithmetic<T>()); }
+    virtual unsigned long long as_unsigned() const override { return to_unsigned(std::is_arithmetic<T>()); }
+
+    // The arithmetic accessors are only ever reached for arithmetic T; the
+    // false_type overloads exist so the virtuals still compile for class types.
+    long double to_floating(std::true_type) const { return static_cast<long double>(v); }
+    long double to_floating(std::false_type) const { throw std::bad_cast(); }
+    long long to_signed(std::true_type) const { return static_cast<long long>(v); }
+    long long to_signed(std::false_type) const { throw std::bad_cast(); }
+    unsigned long long to_unsigned(std::true_type) const { return static_cast<unsigned long long>(v); }
+    unsigned long long to_unsigned(std::false_type) const { throw std::bad_cast(); }
+
     T v;
     T check;
 };
@@ -627,79 +707,79 @@ public:
     basic_extra& operator = (const basic_extra&&) = delete;
 };
 
-template <class T>
+/* A do-nothing bogus operation. Used as the fallback when the chosen
+   implementation index does not map to a real implementation (for example when
+   MAX_BOGUS_IMPLEMENTATIONS is raised above the number of implementations), so
+   that tuning the knob can never select a broken/private type. */
+template <class T, int SEED = 0>
+class extra_none final : public basic_extra
+{
+public:
+    extra_none(const T&) {}
+};
+
+template <class T, int SEED>
 class extra_xor final : public basic_extra
 {
 public:
-    extra_xor(T& a) : v(a)
-    {
-		volatile T lv = MetaRandom<__COUNTER__, 4096>::value;
-        v ^= lv;
-    }
-    virtual ~extra_xor()
-	{
-		volatile T lv = MetaRandom<__COUNTER__ - 1, 4096>::value;
-		v ^= lv;
-	}
+    extra_xor(T& a) : v(a) { v ^= static_cast<T>(SEED); }
+    ~extra_xor() { v ^= static_cast<T>(SEED); }
 
 private:
     volatile T& v;
 };
 
-template <class T>
-class extra_xor <const T> final : public basic_extra
+template <class T, int SEED>
+class extra_xor <const T, SEED> final : public basic_extra
 {
 public:
     extra_xor(const T&) {}
 };
 
-template <class T>
+template <class T, int SEED>
 class extra_addition final : public basic_extra
 {
 public:
-    extra_addition(T& a) : v(a)
-	{
-		volatile T lv = MetaRandom<__COUNTER__, 4096>::value;
-		v += lv;
-	}
-    virtual ~extra_addition()
-	{
-		volatile T lv = MetaRandom<__COUNTER__ - 1, 4096>::value;
-		v -= lv;
-	}
+    extra_addition(T& a) : v(a) { v += static_cast<T>(SEED); }
+    ~extra_addition() { v -= static_cast<T>(SEED); }
+
 private:
     volatile T& v;
 };
 
-template <class T>
-class extra_addition <const T> final: public basic_extra
+template <class T, int SEED>
+class extra_addition <const T, SEED> final: public basic_extra
 {
 public:
     extra_addition(const T&) {}
 };
 
-template <class T>
+template <class T, int SEED>
 class extra_substraction final : public basic_extra
 {
 public:
-    extra_substraction(T& a) : v(a) {v -= MetaRandom<__COUNTER__, 4096>::value; }
-    virtual ~extra_substraction() { v += MetaRandom<__COUNTER__ - 1, 4096>::value; }
+    extra_substraction(T& a) : v(a) { v -= static_cast<T>(SEED); }
+    ~extra_substraction() { v += static_cast<T>(SEED); }
 
 private:
     volatile T& v;
 };
 
-template <class T>
-class extra_substraction <const T> final : public basic_extra
+template <class T, int SEED>
+class extra_substraction <const T, SEED> final : public basic_extra
 {
 public:
     extra_substraction(const T&) {}
 };
 
-template <typename T, int N>
+/* Picks which bogus operation to inject for a given (type, index, seed).
+   Unknown indices fall back to a no-op, so MAX_BOGUS_IMPLEMENTATIONS can be
+   tuned freely without producing a compile error. */
+template <typename T, int N, int SEED>
 class extra_chooser final
 {
-    using type=basic_extra; // intentionally private
+public:
+    using type = extra_none<T, SEED>;
 };
 
 /* Constant obfuscation implementer */
@@ -781,47 +861,49 @@ OBF_TYPE(unsigned long long int)
 
 
 #else
-#define _JOIN(a,b) a##b
-#define N(a) (obf::Num<decltype(a), obf::MetaRandom<__COUNTER__, 4096>::value ^ a>().get() ^ obf::MetaRandom<__COUNTER__ - 1, 4096>::value)
-#define DEFINE_EXTRA(N,implementer) template <typename T> struct extra_chooser<T,N> { using type = implementer<T>; }
+#define OBF_JOIN(a,b) a##b
+#define N(a) (obf::Num<decltype(a), obf::MetaRandom<__COUNTER__, (1 << OBF_CONSTANT_MASK_BITS)>::value ^ a>().get() ^ obf::MetaRandom<__COUNTER__ - 1, (1 << OBF_CONSTANT_MASK_BITS)>::value)
+#define DEFINE_EXTRA(N,implementer) template <typename T, int SEED> struct extra_chooser<T,N,SEED> { using type = implementer<T, SEED>; }
 DEFINE_EXTRA(0, extra_xor);
 DEFINE_EXTRA(1, extra_substraction);
 DEFINE_EXTRA(2, extra_addition);
 #define V(a) ([&](){obf::extra_chooser<std::remove_reference<decltype(a)>::type, obf::MetaRandom<__COUNTER__, \
-            MAX_BOGUS_IMPLEMENTATIONS>::value >::type _JOIN(_ec_,__COUNTER__)(a);\
+            MAX_BOGUS_IMPLEMENTATIONS>::value, obf::MetaRandom<__COUNTER__, 4096>::value >::type OBF_JOIN(obf_ec_,__COUNTER__)(a);\
             return obf::stream_helper();}() << a)
 
-#define FOR(init,cond,inc) { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::for_wrapper( [&](){(init); return __crv; },\
+#define FOR(init,cond,inc) { obf::for_wrapper( [&](){(init); return obf_crv; },\
            [&]()->bool{return (cond); }, \
-           [&](){inc;return __crv;}).set_body( [&]() {
-#define ENDFOR return __crv;}).run(); }
+           [&](){inc;return obf_crv;}).set_body( [&]() {
+#define ENDFOR return obf_crv;}).run(); }
 
-#define END return __crv;}).run(); }
+#define END return obf_crv;}).run(); }
 
-#define IF(x) {std::shared_ptr<obf::base_rvholder> __rvlocal; obf::if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
-#define ELSE return __crv;}).set_else( [&]() {
+#define IF(x) {obf::if_wrapper(( [&]()->bool{ return (x); })).set_then( [&]() {
+#define ELSE return obf_crv;}).set_else( [&]() {
 #define ENDIF END
 
-#define WHILE(x) {std::shared_ptr<obf::base_rvholder> __rvlocal; obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
+#define WHILE(x) {obf::while_wrapper([&]()->bool{ return (x); }).set_body( [&]() {
 #define ENDWHILE END
 
-#define BREAK __crv = obf::next_step::ns_break; throw __crv;
-#define CONTINUE __crv = obf::next_step::ns_continue; throw __crv;
+#define BREAK obf_crv = obf::next_step::ns_break; throw obf_crv;
+#define CONTINUE obf_crv = obf::next_step::ns_continue; throw obf_crv;
 
-#define RETURN(x) __rvlocal.reset(new obf::rvholder<std::remove_reference<decltype(x)>::type>(x,x));  throw __rvlocal;
+#define RETURN(x) obf_rvlocal.reset(new obf::rvholder<std::remove_reference<decltype(x)>::type>(x,x));  throw obf_rvlocal;
 
-#define REPEAT { std::shared_ptr<obf::base_rvholder> __rvlocal; obf::repeat_wrapper().set_body( [&]() {
-#define AS_LONG_AS(x) return __crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
+#define REPEAT { obf::repeat_wrapper().set_body( [&]() {
+#define AS_LONG_AS(x) return obf_crv;}).set_condition([&]()->bool{ return ( (x) ); }).run(); }
 
-#define OBF_BEGIN try { obf::next_step __crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> __rvlocal; (void)__crv;
-#define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } catch (...) {throw;}
+#define OBF_BEGIN try { obf::next_step obf_crv = obf::next_step::ns_done; std::shared_ptr<obf::base_rvholder> obf_rvlocal; (void)obf_crv; (void)obf_rvlocal;
+#define OBF_END } catch(std::shared_ptr<obf::base_rvholder>& r) { return *r; } \
+    catch(obf::next_step&) { throw std::logic_error("obfy: BREAK/CONTINUE used outside of a loop"); } \
+    catch (...) {throw;}
 
-#define CASE(a) try { std::shared_ptr<obf::base_rvholder> __rvlocal;\
-                auto __avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
+#define CASE(a) try { \
+                auto obf_avholder = a; obf::case_wrapper<std::remove_reference<decltype(a)>::type>(a).
 #define ENDCASE run(); } catch(obf::next_step&) {}
-#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(__avholder)>::type>\
-                ( [&,__avholder]() -> std::remove_reference<decltype(__avholder)>::type \
-                { std::remove_reference<decltype(__avholder)>::type __c = (c); return __c;} )).
+#define WHEN(c) add_entry(obf::branch<std::remove_reference<decltype(obf_avholder)>::type>\
+                ( [&,obf_avholder]() -> std::remove_reference<decltype(obf_avholder)>::type \
+                { std::remove_reference<decltype(obf_avholder)>::type obf_c = (c); return obf_c;} )).
 #define DO add_entry( obf::body([&](){
 #define DONE return obf::next_step::ns_continue;})).
 #define OR join().

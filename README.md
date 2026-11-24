@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/fritzone/obfy.svg?branch=master)](https://travis-ci.org/fritzone/obfy)
+[![CI](https://github.com/fritzone/obfy/actions/workflows/ci.yml/badge.svg)](https://github.com/fritzone/obfy/actions/workflows/ci.yml)
 
 # Attacking the licensing problems with C++
 
